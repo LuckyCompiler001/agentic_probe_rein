@@ -10,7 +10,7 @@ import json
 import subprocess
 from pathlib import Path
 from typing import Final
-import openai
+from codex_harness import CodexHarness
 
 from Questions import (
     QUESTION_ZERO,
@@ -101,13 +101,11 @@ dev_plan_template = """
 
 
 def _nlp_call(message: str) -> dict:
-    client = openai.OpenAI()
-    resp = client.chat.completions.create(
-        model=NLP_MODEL,
-        messages=[{"role": "user", "content": message}],
-        response_format={"type": "json_object"},
-    )
-    return json.loads(resp.choices[0].message.content)
+    harness = CodexHarness(model=NLP_MODEL, mode="chat")
+    harness.start_conversation()
+    response = harness.query(message, response_format={"type": "json_object"})
+    harness.exit()
+    return json.loads(response)
 
 
 def _agent_call(prompt: str) -> None:
