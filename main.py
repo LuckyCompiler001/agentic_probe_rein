@@ -8,9 +8,9 @@ from hard_prompt.agent_iterat_improver import PROMPT_SEVEN
 from hard_prompt.agent_exception_catcher import PROMPT_EIGHT
 import json
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Final
-from codex_harness import CodexHarness
 
 from Questions import (
     QUESTION_ZERO,
@@ -21,23 +21,55 @@ from Questions import (
     QUESTION_FIVE,
     QUESTION_SIX,
 )
-# config
 
-NLP_MODEL = "gpt-5.4"
-AGENT_MODEL = "claude-opus-4-7"
-WROKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/dummy_project"
-RESPONSE_DIR = Path(__file__).parent / "response"
+# config
+NLP_MODEL = "opus"
+AGENT_MODEL = "opus"
+WROKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/mimic"
+RUN_BASE = Path(__file__).parent / "response"
+
+# updated per run inside main()
+RESPONSE_DIR: Path = RUN_BASE
+
+
+# ── Progressbar ───────────────────────────────────────────────────────────────
+
+class Progressbar:
+    """Tracks completed steps and stores question answers for resume."""
+
+    def __init__(self, run_dir: Path) -> None:
+        self.path = run_dir / "progressbar.json"
+        self._steps: dict[str, dict] = {}
+        if self.path.exists():
+            data = json.loads(self.path.read_text())
+            self._steps = {s["name"]: s for s in data["steps"]}
+
+    def is_done(self, name: str) -> bool:
+        return self._steps.get(name, {}).get("done", False)
+
+    def get_answer(self, name: str):
+        return self._steps.get(name, {}).get("answer")
+
+    def mark(self, name: str, answer=None) -> None:
+        entry: dict = {"name": name, "done": True}
+        if answer is not None:
+            entry["answer"] = answer
+        self._steps[name] = entry
+        self._save()
+
+    def _save(self) -> None:
+        data = {"steps": list(self._steps.values())}
+        self.path.write_text(json.dumps(data, indent=2))
+
 
 # ── Input helpers ─────────────────────────────────────────────────────────────
 
 def get_input_placeholder(text: str) -> str:
-    """Display a question and return the raw user input string."""
     print(f"\n{text}")
     return input(">> ")
 
 
 def _ask_yn(text: str, default: bool | None = None) -> bool:
-    """Loop until the user enters Y or N. Returns True for Y."""
     while True:
         raw = get_input_placeholder(text).strip().upper()
         if raw == "" and default is not None:
@@ -48,7 +80,6 @@ def _ask_yn(text: str, default: bool | None = None) -> bool:
 
 
 def _ask_int_range(text: str, lo: int, hi: int) -> int:
-    """Loop until the user enters an integer in [lo, hi]."""
     while True:
         raw = get_input_placeholder(text).strip()
         if raw.isdigit():
@@ -59,7 +90,6 @@ def _ask_int_range(text: str, lo: int, hi: int) -> int:
 
 
 def _ask_pos_int(text: str, default: int = 3) -> int:
-    """Loop until the user enters a positive integer, or Enter for default."""
     while True:
         raw = get_input_placeholder(text).strip()
         if raw == "":
@@ -67,6 +97,8 @@ def _ask_pos_int(text: str, default: int = 3) -> int:
         if raw.isdigit() and int(raw) > 0:
             return int(raw)
         print(f"  Invalid input — please enter a positive integer, or press Enter for default ({default}).")
+
+
 # ── State ─────────────────────────────────────────────────────────────────────
 
 USER_ANSWER_ONE: str = ""
@@ -74,8 +106,6 @@ USER_ANSWER_TWO: int = 0
 USER_ANSWER_THREE: int = 0
 USER_ANSWER_FOUR: int = 3
 
-
-# TODO below all action
 probe_template = """
 {
     "probe_designs": [
@@ -100,17 +130,27 @@ dev_plan_template = """
 """
 
 
+# ── Claude helpers ─────────────────────────────────────────────────────────────
+
 def _nlp_call(message: str) -> dict:
-    harness = CodexHarness(model=NLP_MODEL, mode="chat")
-    harness.start_conversation()
-    response = harness.query(message, response_format={"type": "json_object"})
-    harness.exit()
-    return json.loads(response)
+    result = subprocess.run(
+        ["claude", "-p", "--model", NLP_MODEL, "--tools", "", "--no-session-persistence", message],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
 
 
 def _agent_call(prompt: str) -> None:
-    subprocess.run(["claude", "-p", prompt], cwd=WROKING_SPACE, check=True)
+    subprocess.run(
+        ["claude", "-p", "--model", AGENT_MODEL, prompt],
+        cwd=WROKING_SPACE,
+        check=True,
+    )
 
+
+# ── Actions ───────────────────────────────────────────────────────────────────
 
 def action_1_probe_generation_from_context():
     RESPONSE_DIR.mkdir(exist_ok=True)
@@ -176,6 +216,7 @@ def action_run_training() -> tuple[bool, str]:
 
 MAX_FIX_RETRIES = 5
 
+
 def action_x_agentic_exception_catcher():
     success, error = action_run_training()
     retries = 0
@@ -189,51 +230,162 @@ def action_x_agentic_exception_catcher():
         success, error = action_run_training()
     print("Training and probe ran successfully.")
 
+
+# ── Run setup (new / resume) ──────────────────────────────────────────────────
+
+def _setup_run() -> tuple[Path, Progressbar]:
+    RUN_BASE.mkdir(exist_ok=True)
+    existing = sorted(
+        p.name for p in RUN_BASE.iterdir()
+        if p.is_dir() and p.name.isdigit()
+    )
+
+    if existing:
+        print(f"\nExisting runs: {', '.join(existing)}")
+        if _ask_yn("Resume a previous run? (Y/N)"):
+            while True:
+                run_id = get_input_placeholder(
+                    "Enter the run ID (the number shown above) to resume:"
+                ).strip()
+                run_dir = RUN_BASE / run_id
+                if run_dir.is_dir():
+                    pb = Progressbar(run_dir)
+                    print(f"[Resume] Loaded run {run_id}.")
+                    return run_dir, pb
+                print(f"  Run '{run_id}' not found. Please enter one of: {', '.join(existing)}")
+
+    run_id = datetime.now().strftime("%Y%m%d%H%M")
+    run_dir = RUN_BASE / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    pb = Progressbar(run_dir)
+    print(f"[New run] Started run {run_id}.")
+    return run_dir, pb
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    global USER_ANSWER_ONE, USER_ANSWER_TWO, USER_ANSWER_THREE, USER_ANSWER_FOUR
+    global USER_ANSWER_ONE, USER_ANSWER_TWO, USER_ANSWER_THREE, USER_ANSWER_FOUR, RESPONSE_DIR
 
-    # Step 1: confirm setup
-    if not _ask_yn(QUESTION_ZERO):
+    run_dir, pb = _setup_run()
+    RESPONSE_DIR = run_dir
+
+    # ── Step 1: confirm setup ──────────────────────────────────────────────────
+    if not pb.is_done("setup_confirm"):
+        answer = _ask_yn(QUESTION_ZERO)
+        pb.mark("setup_confirm", answer)
+    else:
+        answer = pb.get_answer("setup_confirm")
+        print("[Resume] Setup already confirmed.")
+
+    if not answer:
         print("Please complete the setup before proceeding. Exiting.")
         return
 
-    # Step 2: project context (free text)
-    USER_ANSWER_ONE = get_input_placeholder(QUESTION_ONE).strip()
+    # ── Step 2: project context ────────────────────────────────────────────────
+    if not pb.is_done("project_context"):
+        USER_ANSWER_ONE = get_input_placeholder(QUESTION_ONE).strip()
+        pb.mark("project_context", USER_ANSWER_ONE)
+    else:
+        USER_ANSWER_ONE = pb.get_answer("project_context")
+        print("[Resume] Project context restored.")
 
-    action_1_probe_generation_from_context()
-    action_1a_probe_confidence()
+    if not pb.is_done("probe_generation"):
+        action_1_probe_generation_from_context()
+        pb.mark("probe_generation")
 
+    if not pb.is_done("probe_confidence"):
+        action_1a_probe_confidence()
+        pb.mark("probe_confidence")
+
+    # ── Main loop (each outer iteration = one "cycle") ─────────────────────────
+    cycle = 0
     while True:
-        # Step 3: show probes and let user select one
-        print("\n" + (RESPONSE_DIR / "probe_confidenced.json").read_text())
-        USER_ANSWER_TWO = _ask_int_range(QUESTION_TWO, lo=1, hi=10)
+        cp = f"cycle_{cycle}"
 
-        action_2_dev_doc_generation_from_probe()
-        action_2a_dev_doc_confidence()
+        # Show probes and let user select one
+        if not pb.is_done(f"{cp}/probe_select"):
+            print("\n" + (RESPONSE_DIR / "probe_confidenced.json").read_text())
+            USER_ANSWER_TWO = _ask_int_range(QUESTION_TWO, lo=1, hi=10)
+            pb.mark(f"{cp}/probe_select", USER_ANSWER_TWO)
+        else:
+            USER_ANSWER_TWO = pb.get_answer(f"{cp}/probe_select")
+            print(f"[Resume] Probe {USER_ANSWER_TWO} already selected.")
 
-        # Step 4: show dev docs and let user select one
-        print("\n" + (RESPONSE_DIR / "dev_doc_confidenced.json").read_text())
-        USER_ANSWER_THREE = _ask_int_range(QUESTION_THREE, lo=1, hi=3)
+        if not pb.is_done(f"{cp}/dev_doc_generation"):
+            action_2_dev_doc_generation_from_probe()
+            pb.mark(f"{cp}/dev_doc_generation")
 
-        action_3_agent_implementation()
-        action_x_agentic_exception_catcher()
+        if not pb.is_done(f"{cp}/dev_doc_confidence"):
+            action_2a_dev_doc_confidence()
+            pb.mark(f"{cp}/dev_doc_confidence")
 
-        # Step 5: optionally comment, then iterate
-        if _ask_yn(QUESTION_SIX, default=False):
-            action_4_agent_improvement()
+        # Show dev docs and let user select one
+        if not pb.is_done(f"{cp}/plan_select"):
+            print("\n" + (RESPONSE_DIR / "dev_doc_confidenced.json").read_text())
+            USER_ANSWER_THREE = _ask_int_range(QUESTION_THREE, lo=1, hi=3)
+            pb.mark(f"{cp}/plan_select", USER_ANSWER_THREE)
+        else:
+            USER_ANSWER_THREE = pb.get_answer(f"{cp}/plan_select")
+            print(f"[Resume] Plan {USER_ANSWER_THREE} already selected.")
+
+        if not pb.is_done(f"{cp}/implementation"):
+            action_3_agent_implementation()
+            pb.mark(f"{cp}/implementation")
+
+        if not pb.is_done(f"{cp}/exception_check_1"):
             action_x_agentic_exception_catcher()
-        USER_ANSWER_FOUR = _ask_pos_int(QUESTION_FOUR, default=3)
-        while USER_ANSWER_FOUR > 0:
-            action_4_iterate()
-            action_x_agentic_exception_catcher()
-            USER_ANSWER_FOUR -= 1
+            pb.mark(f"{cp}/exception_check_1")
 
-        # Step 6: continue or exit
-        if not _ask_yn(QUESTION_FIVE):
+        # Optional commentor
+        if not pb.is_done(f"{cp}/comment_confirm"):
+            do_comment = _ask_yn(QUESTION_SIX, default=False)
+            pb.mark(f"{cp}/comment_confirm", do_comment)
+        else:
+            do_comment = pb.get_answer(f"{cp}/comment_confirm")
+            print(f"[Resume] Comment step: {'enabled' if do_comment else 'skipped'}.")
+
+        if do_comment:
+            if not pb.is_done(f"{cp}/improvement"):
+                action_4_agent_improvement()
+                pb.mark(f"{cp}/improvement")
+            if not pb.is_done(f"{cp}/exception_check_2"):
+                action_x_agentic_exception_catcher()
+                pb.mark(f"{cp}/exception_check_2")
+
+        # Iteration count
+        if not pb.is_done(f"{cp}/iter_count"):
+            USER_ANSWER_FOUR = _ask_pos_int(QUESTION_FOUR, default=3)
+            pb.mark(f"{cp}/iter_count", USER_ANSWER_FOUR)
+        else:
+            USER_ANSWER_FOUR = pb.get_answer(f"{cp}/iter_count")
+            print(f"[Resume] Iteration count: {USER_ANSWER_FOUR}.")
+
+        remaining = USER_ANSWER_FOUR
+        iter_idx = 0
+        while remaining > 0:
+            ip = f"{cp}/iter_{iter_idx}"
+            if not pb.is_done(f"{ip}/improve"):
+                action_4_iterate()
+                pb.mark(f"{ip}/improve")
+            if not pb.is_done(f"{ip}/exception_check"):
+                action_x_agentic_exception_catcher()
+                pb.mark(f"{ip}/exception_check")
+            remaining -= 1
+            iter_idx += 1
+
+        # Continue or exit
+        if not pb.is_done(f"{cp}/continue_confirm"):
+            do_continue = _ask_yn(QUESTION_FIVE)
+            pb.mark(f"{cp}/continue_confirm", do_continue)
+        else:
+            do_continue = pb.get_answer(f"{cp}/continue_confirm")
+            print(f"[Resume] Continue: {'yes' if do_continue else 'no'}.")
+
+        if not do_continue:
             print("Goodbye!")
             return
+        cycle += 1
 
 
 if __name__ == "__main__":
