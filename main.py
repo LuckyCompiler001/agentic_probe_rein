@@ -252,7 +252,7 @@ def _setup_run() -> tuple[Path, Progressbar]:
                     return run_dir, pb
                 print(f"  Run '{run_id}' not found. Please enter one of: {', '.join(existing)}")
 
-    run_id = datetime.now().strftime("%Y%m%d%H%M")
+    run_id = datetime.now().strftime("%Y%m%d%H%M%S")
     run_dir = RUN_BASE / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     pb = Progressbar(run_dir)
