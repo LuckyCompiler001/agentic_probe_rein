@@ -144,7 +144,7 @@ def _nlp_call(message: str) -> dict:
 
 def _agent_call(prompt: str) -> None:
     subprocess.run(
-        ["claude", "-p", "--model", AGENT_MODEL, prompt],
+        ["claude", "-p", "--dangerously-skip-permissions", "--model", AGENT_MODEL, prompt],
         cwd=WROKING_SPACE,
         check=True,
     )
@@ -329,7 +329,8 @@ def main():
             USER_ANSWER_THREE = pb.get_answer(f"{cp}/plan_select")
             print(f"[Resume] Plan {USER_ANSWER_THREE} already selected.")
 
-        if not pb.is_done(f"{cp}/implementation"):
+        prober_path = Path(WROKING_SPACE) / "prober.py"
+        if not pb.is_done(f"{cp}/implementation") or not prober_path.exists():
             action_3_agent_implementation()
             pb.mark(f"{cp}/implementation")
 

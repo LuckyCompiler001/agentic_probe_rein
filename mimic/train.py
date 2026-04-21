@@ -16,7 +16,6 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from aim.sdk.agent.research_agent_logger import AGENT_LOG_TEST_PREFIX, ResearchAgentLogger
 from dataset import MIMICMortalityDataset
 from sklearn.metrics import f1_score, roc_auc_score
 from torch.utils.data import DataLoader
@@ -136,8 +135,6 @@ def evaluate(
 def main(data_dir: str) -> None:
     torch.manual_seed(SEED)
     device = select_device()
-    agent_logger = ResearchAgentLogger()
-
     # ---- Load pre-computed features ----
     data_path = Path(data_dir)
     train_ds = MIMICMortalityDataset(data_path, 'train')
@@ -166,11 +163,6 @@ def main(data_dir: str) -> None:
     for epoch in range(1, NUM_EPOCHS + 1):
         train_loss = train_one_epoch(model, train_loader, optimizer, criterion, device)
         val_metrics = evaluate(model, val_loader, criterion, device)
-        agent_logger.log('train_loss', train_loss, step=None, epoch=epoch)
-        agent_logger.log('val_loss', val_metrics['loss'], step=None, epoch=epoch)
-        agent_logger.log('val_auroc', val_metrics['auroc'], step=None, epoch=epoch)
-        agent_logger.log('val_f1', val_metrics['f1'], step=None, epoch=epoch)
-        agent_logger.log('val_acc', val_metrics['acc'], step=None, epoch=epoch)
         if val_metrics['auroc'] > best_auroc:
             best_auroc = val_metrics['auroc']
             torch.save(model.state_dict(), ckpt_path)
@@ -185,9 +177,6 @@ def main(data_dir: str) -> None:
     logger.info('Test: %d samples', len(test_ds))
 
     test_metrics = evaluate(model, test_loader, criterion, device)
-    for key, value in test_metrics.items():
-        agent_logger.log(AGENT_LOG_TEST_PREFIX + key, value, step=None, epoch=None)
-
     logger.info('Done. Best val AUROC: %.4f | Test AUROC: %.4f', best_auroc, test_metrics['auroc'])
 
 
