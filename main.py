@@ -209,8 +209,6 @@ def action_run_training() -> tuple[bool, str]:
         capture_output=True,
         text=True,
     )
-    if result.stdout:
-        print(result.stdout)
     return result.returncode == 0, result.stderr
 
 

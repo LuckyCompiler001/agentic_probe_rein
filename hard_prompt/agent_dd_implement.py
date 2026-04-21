@@ -23,7 +23,7 @@ Write a self-contained `prober.py` that exposes two entry points:
      - status: "PASS" if final_value satisfies the threshold condition, "FAIL" otherwise
      - conclusion: a one-sentence plain-English summary of what the probe found (e.g. "Validation F1 improved steadily from 0.42 to 0.71, crossing the 0.65 threshold at epoch 14.")
 
-  B. Save the following JSON to `WROKING_SPACE/.agent_probe/metric/probe_result.json`:
+  B. Save the following JSON to `WROKING_SPACE/.agent_probe/metric/probe_result_N.json`, where N is the next available integer (1, 2, 3, …) — i.e. find the highest existing probe_result_*.json in that directory and increment by 1, starting at 1 if none exist:
      {
          "metric_name": "string",
          "threshold": float,
@@ -40,7 +40,7 @@ Write a self-contained `prober.py` that exposes two entry points:
          "conclusion": "string"
      }
 
-  C. Generate a Plotly line chart and save it as `WROKING_SPACE/.agent_probe/plot/probe_result.html`.
+  C. Generate a Plotly line chart and save it as `WROKING_SPACE/.agent_probe/plot/probe_result_N.html`, using the same N as the JSON file above.
      The chart must include:
      - A labeled line for the metric values over epochs
      - A horizontal dashed line for the threshold, annotated with its value
