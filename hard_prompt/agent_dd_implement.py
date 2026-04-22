@@ -48,7 +48,7 @@ Write a self-contained `prober.py` that exposes two entry points:
      - Y-axis label: the metric name
      - A text box in the chart showing: min, max, mean, std, delta, trend, and status
      - Color the metric line green if status is PASS, red if FAIL
-     - Requirement: fix the range for all axies of after first chart is generated, so that all subsequent charts have the same y-axis range for comparability
+     - Requirement: fix an appropriate range(what is approprate range is you have to include potential value in later plotting instead of letting data or points out of plot)for all axies of after first chart is generated, so that all subsequent charts have the same y-axis range for comparability
      - Requirement: add a red horizontal line indicate the threshold value, and annotate it with the threshold value
   D. Create both output directories if they do not exist. These saves are mandatory — conclude() must not return without writing both files.
 

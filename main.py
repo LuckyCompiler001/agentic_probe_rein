@@ -235,7 +235,43 @@ def action_run_training() -> tuple[bool, str]:
 MAX_FIX_RETRIES = 5
 
 
+def _probe_artifact_nums(directory: Path, glob: str) -> set[int]:
+    nums: set[int] = set()
+    if not directory.exists():
+        return nums
+    for p in directory.glob(glob):
+        try:
+            nums.add(int(p.stem.rsplit("_", 1)[-1]))
+        except ValueError:
+            continue
+    return nums
+
+
+def _purge_new_probe_artifacts(
+    metric_dir: Path,
+    plot_dir: Path,
+    existing_nums: set[int],
+) -> None:
+    """Delete metric JSON and plot PDF files produced by a failed run."""
+    for p in metric_dir.glob("probe_result_*.json"):
+        try:
+            if int(p.stem.rsplit("_", 1)[-1]) not in existing_nums:
+                p.unlink(missing_ok=True)
+        except ValueError:
+            continue
+    for p in plot_dir.glob("probe_result_*.pdf"):
+        try:
+            if int(p.stem.rsplit("_", 1)[-1]) not in existing_nums:
+                p.unlink(missing_ok=True)
+        except ValueError:
+            continue
+
+
 def action_x_agentic_exception_catcher():
+    metric_dir = Path(WROKING_SPACE) / ".agent_probe" / "metric"
+    plot_dir = Path(WROKING_SPACE) / ".agent_probe" / "plot"
+    existing_nums = _probe_artifact_nums(metric_dir, "probe_result_*.json")
+
     success, error = action_run_training()
     retries = 0
     while not success:
@@ -243,6 +279,7 @@ def action_x_agentic_exception_catcher():
             print(f"Could not fix after {MAX_FIX_RETRIES} attempts. Last error:\n{error}")
             raise RuntimeError("Exception catcher exceeded max retries.")
         retries += 1
+        _purge_new_probe_artifacts(metric_dir, plot_dir, existing_nums)
         print(f"Error detected (attempt {retries}/{MAX_FIX_RETRIES}):\n{error}\nAsking agent to fix...")
         _agent_call(f"{PROMPT_EIGHT}\n\nError output:\n{error}")
         success, error = action_run_training()
@@ -299,6 +336,13 @@ def main():
     if not answer:
         print("Please complete the setup before proceeding. Exiting.")
         return
+
+    # Save the original train.py before any agent touches it.
+    snapshot_dir = Path(WROKING_SPACE) / ".agent_probe" / "snapshot"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_v0 = snapshot_dir / "train_version_0.py"
+    if not snapshot_v0.exists():
+        snapshot_v0.write_text((Path(WROKING_SPACE) / "train.py").read_text())
 
     # ── Step 2: project context ────────────────────────────────────────────────
     if not pb.is_done("project_context"):
