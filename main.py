@@ -424,33 +424,37 @@ def main():
             USER_ANSWER_FOUR = pb.get_answer(f"{cp}/iter_count")
             print(f"[Resume] Iteration count: {USER_ANSWER_FOUR}.")
 
-        remaining = USER_ANSWER_FOUR
-        iter_idx = 0
         agent_probe_dir = Path(WROKING_SPACE) / ".agent_probe"
         # change_log_1 is the baseline marker (no agent changes for the first run).
         change_log_1 = agent_probe_dir / "change_log_1.txt"
         change_log_1.parent.mkdir(parents=True, exist_ok=True)
         if not change_log_1.exists():
             change_log_1.write_text("")
-        while remaining > 0:
-            ip = f"{cp}/iter_{iter_idx}"
-            if not pb.is_done(f"{ip}/improve"):
-                # Snapshot train.py as train_version_{iter_idx+1} before the agent
-                # modifies it. Numbering is 1-based and aligns with probe_result_N.
-                train_src = Path(WROKING_SPACE) / "train.py"
-                snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
-                snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
-                snapshot_dst.write_text(train_src.read_text())
-                action_4_iterate()
-                pb.mark(f"{ip}/improve")
-            if not pb.is_done(f"{ip}/exception_check"):
-                action_x_agentic_exception_catcher()
-                pb.mark(f"{ip}/exception_check")
-            remaining -= 1
-            iter_idx += 1
-            if _probe_passed():
-                print("Probe status: PASS — stopping iterations early.")
-                break
+
+        if _probe_passed():
+            print("Probe already passed before iteration loop — skipping improvement iterations.")
+        else:
+            remaining = USER_ANSWER_FOUR
+            iter_idx = 0
+            while remaining > 0:
+                ip = f"{cp}/iter_{iter_idx}"
+                if not pb.is_done(f"{ip}/improve"):
+                    # Snapshot train.py as train_version_{iter_idx+1} before the agent
+                    # modifies it. Numbering is 1-based and aligns with probe_result_N.
+                    train_src = Path(WROKING_SPACE) / "train.py"
+                    snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
+                    snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
+                    snapshot_dst.write_text(train_src.read_text())
+                    action_4_iterate()
+                    pb.mark(f"{ip}/improve")
+                if not pb.is_done(f"{ip}/exception_check"):
+                    action_x_agentic_exception_catcher()
+                    pb.mark(f"{ip}/exception_check")
+                remaining -= 1
+                iter_idx += 1
+                if _probe_passed():
+                    print("Probe status: PASS — stopping iterations early.")
+                    break
 
         # Continue or exit
         if not pb.is_done(f"{cp}/continue_confirm"):
@@ -463,6 +467,20 @@ def main():
         if not do_continue:
             print("Goodbye!")
             return
+
+        # Clean up before next probe cycle: remove prober.py and restore train.py
+        prober_path = Path(WROKING_SPACE) / "prober.py"
+        if prober_path.exists():
+            prober_path.unlink()
+            print("Removed prober.py.")
+        snapshot_v0 = agent_probe_dir / "snapshot" / "train_version_0.py"
+        if snapshot_v0.exists():
+            train_py = Path(WROKING_SPACE) / "train.py"
+            train_py.write_text(snapshot_v0.read_text())
+            print("Reverted train.py to train_version_0.py.")
+        else:
+            print("Warning: train_version_0.py not found — train.py not reverted.")
+
         cycle += 1
 
 

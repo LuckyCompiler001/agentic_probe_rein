@@ -1,0 +1,114 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "data",
+      "probe_name": "Per-Attribute Class Imbalance Audit",
+      "content": "Compute the positive-class prevalence for each of the 40 CelebA attributes in the training set. CelebA is notoriously imbalanced (e.g., 'Bald' ~2%, 'Mustache' ~4%, 'Young' ~77%, 'Attractive' ~50%). Plot a histogram of positive rates and flag attributes with prevalence <5% or >95%. Healthy signal: training loss weighting (e.g., pos_weight in BCEWithLogitsLoss) or sampling compensates for imbalance, and per-attribute recall on rare classes is non-trivial (>20%). Unhealthy: rare attributes collapse to always-negative predictions, yielding high accuracy but near-zero recall/F1.",
+      "possible_sources": [
+        "Liu et al., 'Deep Learning Face Attributes in the Wild' (ICCV 2015)",
+        "He et al., 'Learning from Imbalanced Data' (TKDE 2009)",
+        "Cui et al., 'Class-Balanced Loss Based on Effective Number of Samples' (CVPR 2019)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "probe_type": "fairness",
+      "probe_name": "Demographic Subgroup Disparity on Gender/Skin-Tone",
+      "content": "Partition the test set by the 'Male' attribute (and optionally 'Pale_Skin' as a proxy for skin tone) and compute per-attribute accuracy, TPR, FPR, and F1 for each subgroup. Compute equalized-odds gaps (|TPR_male - TPR_female|, |FPR_male - FPR_female|) per attribute. Healthy: gaps <5% across most attributes. Unhealthy: large gaps (e.g., 'Attractive' or 'Young' showing >15% TPR gap across gender), indicating the model encodes demographic bias\u2014a well-documented issue on CelebA.",
+      "possible_sources": [
+        "Buolamwini & Gebru, 'Gender Shades' (FAT* 2018)",
+        "Hardt et al., 'Equality of Opportunity in Supervised Learning' (NeurIPS 2016)",
+        "Ramaswamy et al., 'Fair Attribute Classification through Latent Space De-biasing' (CVPR 2021)"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Per-Attribute Expected Calibration Error (ECE)",
+      "content": "After sigmoid, bin each attribute's predicted probabilities into 15 equal-width bins and compute ECE = \u03a3 (|bin|/N) \u00b7 |acc(bin) - conf(bin)|, separately for each of the 40 attributes. Also produce reliability diagrams. Healthy: ECE < 0.05 for most attributes, curves close to diagonal. Unhealthy: systematic over-confidence (curve below diagonal) on rare attributes, indicating BCE-trained multi-label heads require temperature scaling or focal-loss retraining.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks' (ICML 2017)",
+        "Naeini et al., 'Obtaining Well Calibrated Probabilities Using Bayesian Binning' (AAAI 2015)",
+        "Kull et al., 'Beyond Temperature Scaling' (NeurIPS 2019)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train-Val-Test Gap and Overfitting Curve",
+      "content": "Track per-epoch mean BCE loss and mean attribute accuracy on train vs. CelebA official val and test splits. Compute the train\u2013val gap at best-val-epoch. Healthy: smooth monotonically decreasing val loss reaching plateau; train\u2013val accuracy gap <2\u20133%. Unhealthy: val loss diverges while train loss keeps decreasing (classic overfitting), or best-val-epoch is at epoch 1 (underfitting / optimizer issue). Also verify early-stopping was triggered by val, not test.",
+      "possible_sources": [
+        "Prechelt, 'Early Stopping - But When?' (Neural Networks: Tricks of the Trade 1998)",
+        "Goodfellow et al., 'Deep Learning' textbook Ch. 7",
+        "timm training recipes (Wightman, 2021)"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Common-Corruption Robustness (CelebA-C style)",
+      "content": "Evaluate the model on face images corrupted with Gaussian noise, motion blur, JPEG compression, brightness/contrast shifts, and occlusion patches at 5 severity levels (ImageNet-C protocol adapted for faces). Report mean F1 degradation relative to clean test. Healthy: graceful degradation (<10% mean-F1 drop at severity 3). Unhealthy: catastrophic collapse on blur/noise, indicating the model relies on high-frequency texture rather than semantic structure.",
+      "possible_sources": [
+        "Hendrycks & Dietterich, 'Benchmarking Neural Network Robustness to Common Corruptions' (ICLR 2019)",
+        "Geirhos et al., 'ImageNet-trained CNNs are biased towards texture' (ICLR 2019)",
+        "Karkkainen & Joo, 'FairFace' (WACV 2021)"
+      ],
+      "confidence": 0.78
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Spurious Attribute Correlation & Shortcut Detection",
+      "content": "Compute the pairwise Pearson/Phi correlation matrix of the 40 ground-truth attributes in train set, then compute the model's prediction correlation matrix on test. Flag attribute pairs where predicted correlation >> label correlation (e.g., 'Wearing_Lipstick' \u2194 'Male' negative correlation amplified, or 'Heavy_Makeup' predicted from 'Female' cue). Evaluate on counterfactual/mismatched samples (e.g., males with lipstick). Healthy: correlation amplification factor near 1.0. Unhealthy: factor >1.5 indicates shortcut learning.",
+      "possible_sources": [
+        "Zhao et al., 'Men Also Like Shopping: Reducing Gender Bias Amplification' (EMNLP 2017)",
+        "Sagawa et al., 'Distributionally Robust Neural Networks' / Group DRO (ICLR 2020)",
+        "Singh et al., 'Don't Judge an Object by Its Context' (CVPR 2020)"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Grad-CAM Attribute Localization Sanity Check",
+      "content": "For each attribute, generate Grad-CAM/Score-CAM saliency maps on 50 positive test samples and check whether the heatmap aligns with the expected facial region (e.g., 'Eyeglasses' \u2192 eye region, 'Smiling' \u2192 mouth, 'Wearing_Hat' \u2192 top of head). Quantify via pointing-game accuracy using face-parsing segmentation masks (BiSeNet on CelebAMask-HQ). Healthy: >70% pointing-game accuracy for localized attributes. Unhealthy: saliency concentrated on background or unrelated regions, indicating the model uses global image statistics.",
+      "possible_sources": [
+        "Selvaraju et al., 'Grad-CAM' (ICCV 2017)",
+        "Lee et al., 'CelebAMask-HQ' (CVPR 2020)",
+        "Zhang et al., 'Top-down Neural Attention by Excitation Backprop' (IJCV 2018)"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "probe_type": "metric",
+      "probe_name": "Per-Attribute F1 / mAP vs. Na\u00efve Accuracy",
+      "content": "Beyond reporting the CelebA-standard mean accuracy (~91% baseline), compute per-attribute precision, recall, F1, and mean average precision (mAP) at threshold 0.5 and at the threshold that maximizes per-attribute F1. Compare against the 'predict-majority-class' baseline per attribute. Healthy: mean F1 > 0.70 and every attribute beats its majority baseline by >5 F1 points. Unhealthy: attributes where F1\u22480 while accuracy is high (e.g., 'Bald' at 98% accuracy but 0.1 F1), revealing metric-driven illusion of quality.",
+      "possible_sources": [
+        "Liu et al., 'Deep Learning Face Attributes in the Wild' (ICCV 2015)",
+        "Hand & Chellappa, 'Attributes for Improved Attributes' (AAAI 2017)",
+        "He et al., 'Harnessing Synthesized Abstraction Images to Improve Facial Attribute Recognition' (IJCAI 2018)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "efficiency",
+      "probe_name": "Training-Compute Efficiency & Convergence Profile",
+      "content": "Log wall-clock time per epoch, GPU memory, throughput (images/sec), and plot validation mean-F1 vs. wall-clock / vs. FLOPs. Compare the chosen timm backbone's efficiency frontier against lighter alternatives (MobileNetV3, EfficientNet-B0, ResNet-50). Healthy: validation F1 plateaus well before final epoch, and chosen model sits on or near the Pareto frontier. Unhealthy: still-rising val curve at training end (under-trained) or model is Pareto-dominated by a smaller backbone, suggesting over-parameterization for the task.",
+      "possible_sources": [
+        "Tan & Le, 'EfficientNet' (ICML 2019)",
+        "Dehghani et al., 'The Efficiency Misnomer' (ICLR 2022)",
+        "Wightman et al., 'ResNet Strikes Back' (NeurIPS Workshop 2021)"
+      ],
+      "confidence": 0.8
+    },
+    {
+      "probe_type": "data_quality",
+      "probe_name": "Label Noise & Annotator-Disagreement Diagnosis",
+      "content": "CelebA labels are known noisy (annotator disagreement on subjective attributes like 'Attractive', 'Young', 'Oval_Face'). Use confident-learning (cleanlab) to rank suspected mislabeled samples by predicted-probability vs. label disagreement, and manually inspect top-100. Also compute per-attribute loss distribution and flag samples with consistently high loss across epochs (possible mislabels or outliers). Healthy: high-loss samples are genuinely ambiguous edge cases (<3% estimated noise rate for objective attributes like 'Eyeglasses'). Unhealthy: subjective attributes show >15% estimated noise and the model over-fits these noisy labels, hurting generalization.",
+      "possible_sources": [
+        "Northcutt et al., 'Confident Learning' (JAIR 2021)",
+        "Lingenfelter et al., 'A Quantitative Analysis of Labeling Issues in the CelebA Dataset' (ISVC 2022)",
+        "Song et al., 'Learning from Noisy Labels with Deep Neural Networks: A Survey' (TNNLS 2022)"
+      ],
+      "confidence": 0.85
+    }
+  ]
+}
