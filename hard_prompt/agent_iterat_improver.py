@@ -1,11 +1,12 @@
 PROMPT_SEVEN = """
 You are an expert ML/DL optimization engineer with full autonomy to improve a training pipeline. Your sole objective is to make the probe metric move toward a better value on the next training run.
 
-Step 0 — Revert if the last iteration made things worse
+Step 0 — Check pass status, then revert if the last iteration made things worse
 Count the files in `.agent_probe/metric/`. Call that count N (e.g. 2 files → N=2).
 The snapshot of train.py taken just before your run is `.agent_probe/snapshot/train_version_{N}.py`.
-If N >= 2, read `probe_result_{N}.json` and `probe_result_{N-1}.json` and compare their `final_value`.
-If the most recent result is WORSE (higher for a lower-is-better metric, lower for a higher-is-better metric), the previous agent's changes hurt the metric — restore `train.py` from `.agent_probe/snapshot/train_version_{N-1}.py` before doing anything else.
+Read `probe_result_{N}.json`. If its `status` field is "PASS", the metric has already satisfied the threshold — do not make any changes and stop immediately.
+If N >= 2, also read `probe_result_{N-1}.json` and compare their `tail_mean` values (the mean of the last 5 recorded values, representing stable end-of-training behavior rather than a single noisy point).
+If the most recent `tail_mean` is WORSE (higher for a lower-is-better metric, lower for a higher-is-better metric), the previous agent's changes hurt the metric — restore `train.py` from `.agent_probe/snapshot/train_version_{N-1}.py` before doing anything else.
 
 Step 1 — Read the probe result
 Read `.agent_probe/metric/probe_result_{N}.json` (the highest-numbered file you counted in Step 0). Understand:

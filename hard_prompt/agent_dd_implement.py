@@ -19,7 +19,8 @@ Write a self-contained `prober.py` that exposes two entry points:
   A. Compute statistics over all recorded values:
      - min, max, mean, std of the metric series
      - delta: final_value minus first_value (positive = improving toward higher-is-better threshold, negative = degrading)
-     - status: "PASS" if final_value satisfies the threshold condition, "FAIL" otherwise
+     - tail_mean: the mean of the last 5 recorded values (or all values if fewer than 5 exist)
+     - status: "PASS" if tail_mean satisfies the threshold condition, "FAIL" otherwise
      - conclusion: a one-sentence plain-English summary of what the probe found (e.g. "Validation F1 improved steadily from 0.42 to 0.71, crossing the 0.65 threshold at epoch 14.")
 
   B. Save the following JSON to `WROKING_SPACE/.agent_probe/metric/probe_result_N.json`, where N is the next available integer (1, 2, 3, …) — i.e. find the highest existing probe_result_*.json in that directory and increment by 1, starting at 1 if none exist:
@@ -34,6 +35,7 @@ Write a self-contained `prober.py` that exposes two entry points:
          "first_value": float,
          "final_value": float,
          "delta": float,
+         "tail_mean": float,
          "status": "PASS" | "FAIL",
          "conclusion": "string"
      }
