@@ -150,6 +150,26 @@ def _agent_call(prompt: str) -> None:
     )
 
 
+def _probe_passed() -> bool:
+    metric_dir = Path(WROKING_SPACE) / ".agent_probe" / "metric"
+    if not metric_dir.exists():
+        return False
+    nums = []
+    for p in metric_dir.glob("probe_result_*.json"):
+        try:
+            nums.append(int(p.stem.rsplit("_", 1)[-1]))
+        except ValueError:
+            continue
+    if not nums:
+        return False
+    latest = metric_dir / f"probe_result_{max(nums)}.json"
+    try:
+        data = json.loads(latest.read_text())
+        return data.get("status") == "PASS"
+    except Exception:
+        return False
+
+
 # ── Actions ───────────────────────────────────────────────────────────────────
 
 def action_1_probe_generation_from_context():
@@ -362,9 +382,21 @@ def main():
 
         remaining = USER_ANSWER_FOUR
         iter_idx = 0
+        agent_probe_dir = Path(WROKING_SPACE) / ".agent_probe"
+        # change_log_1 is the baseline marker (no agent changes for the first run).
+        change_log_1 = agent_probe_dir / "change_log_1.txt"
+        change_log_1.parent.mkdir(parents=True, exist_ok=True)
+        if not change_log_1.exists():
+            change_log_1.write_text("")
         while remaining > 0:
             ip = f"{cp}/iter_{iter_idx}"
             if not pb.is_done(f"{ip}/improve"):
+                # Snapshot train.py as train_version_{iter_idx+1} before the agent
+                # modifies it. Numbering is 1-based and aligns with probe_result_N.
+                train_src = Path(WROKING_SPACE) / "train.py"
+                snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
+                snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
+                snapshot_dst.write_text(train_src.read_text())
                 action_4_iterate()
                 pb.mark(f"{ip}/improve")
             if not pb.is_done(f"{ip}/exception_check"):
@@ -372,6 +404,9 @@ def main():
                 pb.mark(f"{ip}/exception_check")
             remaining -= 1
             iter_idx += 1
+            if _probe_passed():
+                print("Probe status: PASS — stopping iterations early.")
+                break
 
         # Continue or exit
         if not pb.is_done(f"{cp}/continue_confirm"):

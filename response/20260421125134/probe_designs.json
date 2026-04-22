@@ -1,0 +1,115 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Ethnicity Subgroup AUROC Disparity",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, and Brier score separately for each of the 6 ethnicity groups. Compute disparity metrics (max-min gap, standard deviation across groups, equalized odds difference). Healthy signal: performance gaps < 0.05 AUROC across groups with overlapping bootstrap confidence intervals. Unhealthy: one or more groups (typically minority: Hispanic, Asian, Black) show AUROC > 0.05 lower than majority group, indicating systematic disparity. Apply stratified bootstrapping to quantify uncertainty given small subgroup sizes.",
+      "possible_sources": [
+        "Chen et al. 'Ethical Machine Learning in Healthcare' (Annual Review of Biomedical Data Science, 2021)",
+        "Seyyed-Kalantari et al. 'Underdiagnosis bias of AI algorithms' (Nature Medicine, 2021)",
+        "MIMIC-III benchmark by Harutyunyan et al. 2019",
+        "Fairlearn toolkit"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Subgroup Calibration Analysis",
+      "content": "Since output is mortality probability, evaluate calibration globally and per ethnicity group using reliability diagrams, Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Hosmer-Lemeshow test. Check if predicted probabilities match observed mortality rates within each decile. Healthy: ECE < 0.05 across all subgroups, calibration curves near diagonal. Unhealthy: systematic over/under-prediction for specific ethnic groups, indicating miscalibration that could bias clinical decisions differently across populations.",
+      "possible_sources": [
+        "Guo et al. 'On Calibration of Modern Neural Networks' (ICML 2017)",
+        "Pfohl et al. 'An empirical characterization of fair machine learning for clinical risk prediction' (JBI 2021)",
+        "Barda et al. 'Addressing bias in prediction models' (Nature Medicine 2021)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Class and Ethnicity Distribution Audit",
+      "content": "Audit the joint distribution of mortality label and ethnicity. Check: (1) class imbalance ratio (ICU mortality is typically 10-15%), (2) sample size per ethnicity group, (3) mortality prevalence within each ethnicity. Healthy: documented imbalance addressed with stratified sampling, class weighting, or focal loss. Unhealthy: severe underrepresentation of minority ethnicities (<100 samples) combined with different base rates, which causes the model to default to majority-group priors and amplifies bias.",
+      "possible_sources": [
+        "Johnson et al. 'MIMIC-III, a freely accessible critical care database' (Scientific Data 2016)",
+        "Harutyunyan et al. 'Multitask learning and benchmarking with clinical time series data' 2019",
+        "Rajkomar et al. 'Ensuring Fairness in Machine Learning to Advance Health Equity' (Annals of Internal Medicine 2018)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train/Validation/Test Loss Trajectory",
+      "content": "Plot training and validation loss (binary cross-entropy) per epoch. Check for overfitting given the high-dimensional 10,000-dim TF-IDF input with potentially limited ICU samples. Healthy: validation loss decreases monotonically then plateaus; small train-val gap. Unhealthy: validation loss diverges from training loss after a few epochs (overfitting to sparse TF-IDF features), or train loss fails to decrease (underfitting due to poor feature representation). Recommend early stopping based on validation AUROC.",
+      "possible_sources": [
+        "Goodfellow et al. 'Deep Learning' textbook Chapter 7",
+        "Prechelt 'Early Stopping - But When?' 1998",
+        "Caruana et al. 'Overfitting in Neural Nets' NIPS 2000"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Ethnicity Feature Ablation / Counterfactual Test",
+      "content": "Test whether the model inappropriately relies on the ethnicity one-hot vector. Run three evaluations: (1) with true ethnicity, (2) with ethnicity set to majority class for all, (3) with ethnicity randomized. Measure AUROC shift and per-patient prediction change. Healthy: small predictive shift, indicating ethnicity is used as a minor covariate, not a primary signal. Unhealthy: large AUROC drop or high flip rate when ethnicity is altered, indicating the model encodes ethnicity-based shortcuts rather than clinical features.",
+      "possible_sources": [
+        "Kusner et al. 'Counterfactual Fairness' (NeurIPS 2017)",
+        "Pfohl et al. 'Counterfactual reasoning for fair clinical risk prediction' (MLHC 2019)",
+        "Geirhos et al. 'Shortcut Learning in Deep Neural Networks' (Nature Machine Intelligence 2020)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "TF-IDF Feature Importance and Clinical Plausibility",
+      "content": "Extract top-k most influential TF-IDF tokens for mortality prediction using coefficient weights (linear) or SHAP/LIME (nonlinear). Check clinical plausibility: expect tokens like 'cardiac arrest', 'sepsis', 'intubation', 'DNR'. Stratify importance by ethnicity subgroup to detect group-specific spurious correlations. Healthy: top features are clinically meaningful and consistent across subgroups. Unhealthy: top features include demographic markers, artifacts (e.g., template phrases, provider names), or subgroup-specific shortcuts such as hospital location terms.",
+      "possible_sources": [
+        "Ribeiro et al. 'Why Should I Trust You?: Explaining the Predictions of Any Classifier' (KDD 2016)",
+        "Lundberg & Lee 'A Unified Approach to Interpreting Model Predictions' (NeurIPS 2017)",
+        "Caruana et al. 'Intelligible Models for Healthcare' (KDD 2015)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "loss",
+      "probe_name": "Per-Subgroup Loss Decomposition",
+      "content": "Decompose the aggregate binary cross-entropy loss into per-ethnicity components weighted by subgroup size. Track these during training. Healthy: all subgroup losses decrease at similar rates and converge to similar values. Unhealthy: minority-group loss plateaus early or oscillates while majority-group loss continues decreasing, indicating the optimizer is dominated by majority gradients. Suggests need for group-reweighted loss, DRO (distributionally robust optimization), or balanced batch sampling.",
+      "possible_sources": [
+        "Sagawa et al. 'Distributionally Robust Neural Networks for Group Shifts' (ICLR 2020)",
+        "Byrd & Lipton 'What is the Effect of Importance Weighting in Deep Learning?' (ICML 2019)",
+        "Hashimoto et al. 'Fairness Without Demographics in Repeated Loss Minimization' (ICML 2018)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Input Perturbation and Note Length Sensitivity",
+      "content": "Test robustness by perturbing TF-IDF inputs: (1) drop 10-30% of non-zero features randomly, (2) add Gaussian noise, (3) truncate to shorter note lengths. Evaluate per-subgroup AUROC degradation. Healthy: gradual, similar degradation across groups, indicating reliance on distributed signal. Unhealthy: sharp performance collapse under perturbation, or asymmetric degradation where one ethnicity group degrades faster, indicating fragile or group-specific feature reliance. Also check correlation between note length and prediction confidence across groups.",
+      "possible_sources": [
+        "Hendrycks & Dietterich 'Benchmarking Neural Network Robustness' (ICLR 2019)",
+        "Wallace et al. 'Universal Adversarial Triggers for NLP' (EMNLP 2019)",
+        "Zhang et al. 'Hurtful Words: Quantifying Biases in Clinical Contextual Word Embeddings' (CHIL 2020)"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Cross-Validation Stability and Seed Variance",
+      "content": "Run k-fold stratified cross-validation (stratified by both mortality and ethnicity) with at least 5 random seeds. Report mean \u00b1 std of global and per-subgroup AUROC. Healthy: standard deviation < 0.02 AUROC across folds/seeds, stable ranking of subgroup performance. Unhealthy: high variance (>0.05 AUROC), particularly for minority subgroups, indicating the model is unstable and findings of bias may be non-reproducible. Also test via bootstrap confidence intervals whether observed fairness gaps are statistically significant.",
+      "possible_sources": [
+        "Bouthillier et al. 'Accounting for Variance in Machine Learning Benchmarks' (MLSys 2021)",
+        "Cooper et al. 'Variance, Self-Consistency, and Arbitrariness in Fair Classification' (ICML 2024)",
+        "scikit-learn StratifiedKFold documentation"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "efficiency",
+      "probe_name": "Dimensionality vs. Sample Size Diagnostic",
+      "content": "With 10,000-dim TF-IDF features, check the n/p ratio. If ICU cohort is ~10,000-50,000 patients, the model risks underdetermination. Diagnostic: (1) rank of training feature matrix, (2) condition number, (3) performance vs. number of top-k features retained via mutual information / chi-squared filtering, (4) comparison against L1-regularized logistic regression baseline. Healthy: model performance saturates well before using all 10k features; sparse coefficients. Unhealthy: training AUROC near 1.0 with unstable validation metrics, indicating memorization. Suggests dimensionality reduction (SVD, LSA) or sparsity constraints.",
+      "possible_sources": [
+        "Tibshirani 'Regression Shrinkage and Selection via the Lasso' (JRSS 1996)",
+        "Ng 'Feature selection, L1 vs L2 regularization' (ICML 2004)",
+        "Hastie, Tibshirani, Friedman 'The Elements of Statistical Learning' Ch.18 High-Dimensional Problems"
+      ],
+      "confidence": 0.0
+    }
+  ]
+}

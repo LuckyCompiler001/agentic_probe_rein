@@ -15,7 +15,7 @@ For each plan, fill in all four fields:
 
 `metric` — a single, concrete, numerical quantity that this probe produces and that can be computed once per epoch (or per regular training interval). It must be a float a script can record automatically at each step and plot as a time series (e.g. "mean gradient norm across all layers per epoch", "validation loss per epoch", "macro F1 on held-out set per epoch"). Do not define a metric that is only computable once after training ends.
 
-`threshold` — a single float value that acts as the reference line on a time-series plot of the metric — the boundary between healthy and problematic (e.g. 0.05, 10.0, 0.75). Express it as a plain number, then briefly justify it. The implementation will draw this as a horizontal line on the metric chart so a human can instantly see whether the curve is above or below the target.
+`threshold` — a single float value that acts as the reference line on a time-series plot of the metric — the boundary between healthy and problematic (e.g. 0.05, 10.0, 0.75). Express it as a plain number, then briefly justify it. The implementation will draw this as a horizontal line on the metric chart so a human can instantly see whether the curve is above or below the target. The threshold must be realistic and achievable: calibrate it against what a standard training run on this model architecture and dataset can plausibly reach. A threshold that is tighter than the model's natural capability will never be crossed regardless of optimization effort — if in doubt, set a conservative (easier) threshold that a well-tuned run can meet, rather than an aspirational one that cannot.
 
 `confidence` — set to 0.0 for all plans; it will be filled by a supervisor agent.
 

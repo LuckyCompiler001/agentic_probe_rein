@@ -19,7 +19,6 @@ Write a self-contained `prober.py` that exposes two entry points:
   A. Compute statistics over all recorded values:
      - min, max, mean, std of the metric series
      - delta: final_value minus first_value (positive = improving toward higher-is-better threshold, negative = degrading)
-     - trend: "improving", "degrading", or "stable" (stable if abs(delta) < 1% of the threshold)
      - status: "PASS" if final_value satisfies the threshold condition, "FAIL" otherwise
      - conclusion: a one-sentence plain-English summary of what the probe found (e.g. "Validation F1 improved steadily from 0.42 to 0.71, crossing the 0.65 threshold at epoch 14.")
 
@@ -35,7 +34,6 @@ Write a self-contained `prober.py` that exposes two entry points:
          "first_value": float,
          "final_value": float,
          "delta": float,
-         "trend": "improving" | "degrading" | "stable",
          "status": "PASS" | "FAIL",
          "conclusion": "string"
      }
