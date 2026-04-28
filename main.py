@@ -29,7 +29,7 @@ from Questions import (
 # config
 NLP_MODEL = "opus"
 AGENT_MODEL = "opus"
-WROKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/CelebFaces_Attributes_Classification"
+WORKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/CelebFaces_Attributes_Classification"
 RUN_BASE = Path(__file__).parent / "response"
 
 # updated per run inside main()
@@ -149,13 +149,13 @@ def _nlp_call(message: str) -> dict:
 def _agent_call(prompt: str) -> None:
     subprocess.run(
         ["claude", "-p", "--dangerously-skip-permissions", "--model", AGENT_MODEL, prompt],
-        cwd=WROKING_SPACE,
+        cwd=WORKING_SPACE,
         check=True,
     )
 
 
 def _probe_passed() -> bool:
-    metric_dir = Path(WROKING_SPACE) / ".agent_probe" / "metric"
+    metric_dir = Path(WORKING_SPACE) / ".agent_probe" / "metric"
     if not metric_dir.exists():
         return False
     nums = []
@@ -237,7 +237,7 @@ def action_auto_research_iterate():
 def action_run_training() -> tuple[bool, str]:
     result = subprocess.run(
         ["python", "train.py"],
-        cwd=WROKING_SPACE,
+        cwd=WORKING_SPACE,
         capture_output=True,
         text=True,
     )
@@ -280,8 +280,8 @@ def _purge_new_probe_artifacts(
 
 
 def action_x_agentic_exception_catcher():
-    metric_dir = Path(WROKING_SPACE) / ".agent_probe" / "metric"
-    plot_dir = Path(WROKING_SPACE) / ".agent_probe" / "plot"
+    metric_dir = Path(WORKING_SPACE) / ".agent_probe" / "metric"
+    plot_dir = Path(WORKING_SPACE) / ".agent_probe" / "plot"
     existing_nums = _probe_artifact_nums(metric_dir, "probe_result_*.json")
 
     success, error = action_run_training()
@@ -350,11 +350,11 @@ def main():
         return
 
     # Save the original train.py before any agent touches it.
-    snapshot_dir = Path(WROKING_SPACE) / ".agent_probe" / "snapshot"
+    snapshot_dir = Path(WORKING_SPACE) / ".agent_probe" / "snapshot"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     snapshot_v0 = snapshot_dir / "train_version_0.py"
     if not snapshot_v0.exists():
-        snapshot_v0.write_text((Path(WROKING_SPACE) / "train.py").read_text())
+        snapshot_v0.write_text((Path(WORKING_SPACE) / "train.py").read_text())
 
     # ── Step 2: auto-research feature choice (one upfront switch) ──────────────
     if not pb.is_done("auto_research_choice"):
@@ -420,7 +420,7 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
             USER_ANSWER_THREE = pb.get_answer(f"{cp}/plan_select")
             print(f"[Resume] Plan {USER_ANSWER_THREE} already selected.")
 
-        prober_path = Path(WROKING_SPACE) / "prober.py"
+        prober_path = Path(WORKING_SPACE) / "prober.py"
         if not pb.is_done(f"{cp}/implementation") or not prober_path.exists():
             action_3_agent_implementation()
             pb.mark(f"{cp}/implementation")
@@ -437,7 +437,7 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
             USER_ANSWER_FOUR = pb.get_answer(f"{cp}/iter_count")
             print(f"[Resume] Iteration count: {USER_ANSWER_FOUR}.")
 
-        agent_probe_dir = Path(WROKING_SPACE) / ".agent_probe"
+        agent_probe_dir = Path(WORKING_SPACE) / ".agent_probe"
         # change_log_1 is the baseline marker (no agent changes for the first run).
         change_log_1 = agent_probe_dir / "change_log_1.txt"
         change_log_1.parent.mkdir(parents=True, exist_ok=True)
@@ -454,7 +454,7 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
                 if not pb.is_done(f"{ip}/improve"):
                     # Snapshot train.py as train_version_{iter_idx+1} before the agent
                     # modifies it. Numbering is 1-based and aligns with probe_result_N.
-                    train_src = Path(WROKING_SPACE) / "train.py"
+                    train_src = Path(WORKING_SPACE) / "train.py"
                     snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
                     snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
                     snapshot_dst.write_text(train_src.read_text())
@@ -482,13 +482,13 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
             return
 
         # Clean up before next probe cycle: remove prober.py and restore train.py
-        prober_path = Path(WROKING_SPACE) / "prober.py"
+        prober_path = Path(WORKING_SPACE) / "prober.py"
         if prober_path.exists():
             prober_path.unlink()
             print("Removed prober.py.")
         snapshot_v0 = agent_probe_dir / "snapshot" / "train_version_0.py"
         if snapshot_v0.exists():
-            train_py = Path(WROKING_SPACE) / "train.py"
+            train_py = Path(WORKING_SPACE) / "train.py"
             train_py.write_text(snapshot_v0.read_text())
             print("Reverted train.py to train_version_0.py.")
         else:
@@ -500,8 +500,8 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
 def _run_auto_research_pipeline(pb: Progressbar) -> None:
     global USER_ANSWER_FOUR
 
-    agent_probe_dir = Path(WROKING_SPACE) / ".agent_probe"
-    prober_path = Path(WROKING_SPACE) / "prober.py"
+    agent_probe_dir = Path(WORKING_SPACE) / ".agent_probe"
+    prober_path = Path(WORKING_SPACE) / "prober.py"
 
     # Agent picks a standard performance metric, writes prober.py, integrates with train.py.
     if not pb.is_done("ar/probe_setup") or not prober_path.exists():
@@ -547,7 +547,7 @@ def _run_auto_research_pipeline(pb: Progressbar) -> None:
             if not pb.is_done(f"{ip}/improve"):
                 # Snapshot train.py as train_version_{iter_idx+1} before the agent
                 # modifies it. Numbering aligns with probe_result_N (same convention as normal mode).
-                train_src = Path(WROKING_SPACE) / "train.py"
+                train_src = Path(WORKING_SPACE) / "train.py"
                 snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
                 snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
                 snapshot_dst.write_text(train_src.read_text())

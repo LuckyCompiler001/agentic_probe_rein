@@ -29,7 +29,7 @@ Write a self-contained `prober.py` that exposes two entry points:
      - status: "PASS" if tail_mean satisfies the threshold condition (in the correct direction for the chosen metric), "FAIL" otherwise
      - conclusion: a one-sentence plain-English summary of what the probe found (e.g. "Validation RMSE fell from 0.81 to 0.42, comfortably under the 0.50 threshold by epoch 9.")
 
-  B. Save the following JSON to `WROKING_SPACE/.agent_probe/metric/probe_result_N.json`, where N is the next available integer (find the highest existing `probe_result_*.json` in that directory and add 1, or start at 1 if none exist):
+  B. Save the following JSON to `WORKING_SPACE/.agent_probe/metric/probe_result_N.json`, where N is the next available integer (find the highest existing `probe_result_*.json` in that directory and add 1, or start at 1 if none exist):
      {
          "metric_name": "string",
          "threshold": float,

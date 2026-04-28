@@ -6,7 +6,7 @@ import sys
 
 NLP_MODEL = "opus"
 AGENT_MODEL = "opus"
-WROKING_SPACE = "/home/xuanhe_linux_001/agentic_probe_rein/dummy_project"
+WORKING_SPACE = "/home/xuanhe_linux_001/agentic_probe_rein/dummy_project"
 
 
 def test_nlp():
@@ -30,7 +30,7 @@ def test_agent():
     print("── Agent (Claude, full tools) ─────────────────────")
     result = subprocess.run(
         ["claude", "-p", "--model", AGENT_MODEL, "Reply with exactly the word PONG and nothing else."],
-        cwd=WROKING_SPACE,
+        cwd=WORKING_SPACE,
         capture_output=True,
         text=True,
     )
