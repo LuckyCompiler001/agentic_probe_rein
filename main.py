@@ -523,9 +523,9 @@ def _run_auto_research_pipeline(pb: Progressbar) -> None:
         action_x_agentic_exception_catcher()
         pb.mark("ar/exception_check_2")
 
-    # Iteration count
+    # Iteration count (auto-research defaults to 10 vs 3 in normal mode)
     if not pb.is_done("ar/iter_count"):
-        USER_ANSWER_FOUR = _ask_pos_int(QUESTION_FOUR, default=3)
+        USER_ANSWER_FOUR = _ask_pos_int(QUESTION_FOUR, default=10)
         pb.mark("ar/iter_count", USER_ANSWER_FOUR)
     else:
         USER_ANSWER_FOUR = pb.get_answer("ar/iter_count")
