@@ -29,7 +29,7 @@ from Questions import (
 # config
 NLP_MODEL = "opus"
 AGENT_MODEL = "opus"
-WORKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/CelebFaces_Attributes_Classification"
+WORKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/home_credit"
 RUN_BASE = Path(__file__).parent / "response"
 
 # updated per run inside main()
@@ -537,30 +537,27 @@ def _run_auto_research_pipeline(pb: Progressbar) -> None:
     if not change_log_1.exists():
         change_log_1.write_text("")
 
-    if _probe_passed():
-        print("Probe already passed before iteration loop — skipping improvement iterations.")
-    else:
-        remaining = USER_ANSWER_FOUR
-        iter_idx = 0
-        while remaining > 0:
-            ip = f"ar/iter_{iter_idx}"
-            if not pb.is_done(f"{ip}/improve"):
-                # Snapshot train.py as train_version_{iter_idx+1} before the agent
-                # modifies it. Numbering aligns with probe_result_N (same convention as normal mode).
-                train_src = Path(WORKING_SPACE) / "train.py"
-                snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
-                snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
-                snapshot_dst.write_text(train_src.read_text())
-                action_auto_research_iterate()
-                pb.mark(f"{ip}/improve")
-            if not pb.is_done(f"{ip}/exception_check"):
-                action_x_agentic_exception_catcher()
-                pb.mark(f"{ip}/exception_check")
-            remaining -= 1
-            iter_idx += 1
-            if _probe_passed():
-                print("Probe status: PASS — stopping iterations early.")
-                break
+    # Auto-research mode: no PASS gate — always run the full iteration count so
+    # the metric is pushed gradually across all rounds. Regression revert (if a
+    # round made the metric worse) is handled inside the iteration prompt.
+    remaining = USER_ANSWER_FOUR
+    iter_idx = 0
+    while remaining > 0:
+        ip = f"ar/iter_{iter_idx}"
+        if not pb.is_done(f"{ip}/improve"):
+            # Snapshot train.py as train_version_{iter_idx+1} before the agent
+            # modifies it. Numbering aligns with probe_result_N (same convention as normal mode).
+            train_src = Path(WORKING_SPACE) / "train.py"
+            snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
+            snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_dst.write_text(train_src.read_text())
+            action_auto_research_iterate()
+            pb.mark(f"{ip}/improve")
+        if not pb.is_done(f"{ip}/exception_check"):
+            action_x_agentic_exception_catcher()
+            pb.mark(f"{ip}/exception_check")
+        remaining -= 1
+        iter_idx += 1
 
     print("Auto-research pipeline finished. Goodbye!")
 
