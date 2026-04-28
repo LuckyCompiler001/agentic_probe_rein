@@ -1,0 +1,115 @@
+{
+  "steps": [
+    {
+      "name": "setup_confirm",
+      "done": true,
+      "answer": true
+    },
+    {
+      "name": "auto_research_choice",
+      "done": true,
+      "answer": true
+    },
+    {
+      "name": "ar/probe_setup",
+      "done": true
+    },
+    {
+      "name": "ar/exception_check_1",
+      "done": true
+    },
+    {
+      "name": "ar/comment",
+      "done": true
+    },
+    {
+      "name": "ar/exception_check_2",
+      "done": true
+    },
+    {
+      "name": "ar/iter_count",
+      "done": true,
+      "answer": 10
+    },
+    {
+      "name": "ar/iter_0/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_0/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_1/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_1/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_2/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_2/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_3/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_3/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_4/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_4/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_5/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_5/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_6/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_6/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_7/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_7/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_8/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_8/exception_check",
+      "done": true
+    },
+    {
+      "name": "ar/iter_9/improve",
+      "done": true
+    },
+    {
+      "name": "ar/iter_9/exception_check",
+      "done": true
+    }
+  ]
+}

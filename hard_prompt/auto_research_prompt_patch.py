@@ -74,6 +74,12 @@ Your job for THIS iteration is simple and strict: pick exactly ONE of those comm
 
 Important: this is a PERFORMANCE-MONITORING probe. There is NO threshold and NO pass/fail. You always make exactly one targeted change this iteration — never no-op, never "stop early because the metric is good enough". The orchestrator decides when iterations end, not you.
 
+Equally important: do NOT try to fix everything at once or swing a parameter all the way to its ideal value in a single iteration. Many rounds are scheduled — each round contributes a small step. Be conservative:
+- If a comment suggests increasing a parameter, take a moderate step toward the suggested target (e.g. 2x-5x of the current value, or partway toward what the comment names) rather than the full jump in one go.
+- If a comment suggests turning on an expensive feature flag (e.g. `INCLUDE_AUXILIARY = True`), that single boolean toggle counts as one change — apply it cleanly without simultaneously rewriting other parameters.
+- Never combine the change suggested by your chosen comment with edits to any other comment's referenced code. One comment, one targeted edit.
+- A small, safe change that nudges the metric in the right direction is the goal. Aggressive changes that risk overshooting and forcing a revert in the next round waste an iteration.
+
 Step 0 — Regression revert check
 Count the files in `.agent_probe/metric/`. Call that count N (e.g. 2 files → N = 2).
 The snapshot of `train.py` taken just before this iteration is `.agent_probe/snapshot/train_version_{N}.py`.

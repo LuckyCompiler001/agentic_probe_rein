@@ -1,11 +1,20 @@
 PROMPT_SIX = """
 You are an expert ML/DL code reviewer. Your job is to annotate a training script with improvement suggestions — but you must not change any code.
 
+Hard rule on what counts as a valid suggestion: every comment MUST be about something that directly moves the probe metric (i.e. the model's measured performance on the task). Any comment that is purely about code style, readability, naming, type hints, docstrings, refactoring for cleanliness, logging verbosity, file organisation, dead code, or other non-performance concerns is FORBIDDEN. If a place in the code has only stylistic room for improvement, do not annotate it — pick a different place that actually affects training outcome.
+
 Step 1 — Understand the probe
-Read `prober.py` to understand what aspect of training quality is being evaluated: what metric is tracked, what threshold is used, and what the probe considers healthy vs. problematic.
+Read `prober.py` to understand what the probe measures: which metric is tracked and the direction in which improvement means (higher_is_better or lower_is_better). The metric defines what "performance-related" means for this task.
 
 Step 2 — Review the training script
-Read `train.py` carefully. With the probe's evaluation criteria in mind, identify exactly 10 places in the code that have meaningful room for improvement — spots where a change could positively move the probe's metric in the desired direction, or reduce the risk of the metric crossing into the problematic zone.
+Read `train.py` carefully. With the probe's metric in mind, identify exactly 10 places in the code where a change could meaningfully move the metric in the better direction. Examples of valid targets (non-exhaustive):
+- Model hyperparameters (learning rate, num_leaves, depth, regularization, n_estimators, dropout, etc.)
+- Training schedule (early stopping patience, scheduler, optimizer choice)
+- Data handling that affects what the model learns (train/valid split size, stratification, class imbalance handling, missingness handling, feature inclusion / exclusion, downsampling)
+- Feature engineering toggles or aggregations that the script already exposes
+- Loss / objective choice
+- Validation strategy
+Anything that does NOT plausibly change the metric value is not a valid target. Do not comment on it.
 
 Step 3 — Add comments only
 For each of the 10 places, insert an inline comment on the relevant line (or the line immediately above it if the line is too dense). Label them sequentially:
@@ -17,9 +26,10 @@ For each of the 10 places, insert an inline comment on the relevant line (or the
 
 Rules:
 - Do not change any existing code — only add comment lines
-- Each comment must be specific: name the technique, parameter, or pattern to change, and explain how it relates to the probe metric
-- Spread the 10 comments across different parts of the file (data loading, model definition, optimizer, training loop, validation, etc.) — do not cluster them in one section
-- Do not add comments to lines that are already obviously correct and leave no room for improvement
+- Each comment must be specific: name the technique, parameter, or pattern to change, and explain how the change is expected to move the metric in the better direction
+- Spread the 10 comments across different parts of the file (data loading / preprocessing, model definition, optimiser / training loop, validation / split logic) — do not cluster them in one section
+- Do not annotate places that are already obviously correct and have no performance-relevant room for improvement
+- No stylistic, readability, naming, typing, docstring, refactoring, logging, or organisational comments — those are explicitly forbidden
 
 Modify only `train.py`. Do not touch `prober.py`.
 """
