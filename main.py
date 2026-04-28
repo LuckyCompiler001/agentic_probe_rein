@@ -6,6 +6,10 @@ from hard_prompt.agent_dd_implement import PROMPT_FIVE
 from hard_prompt.agent_improve_commentor import PROMPT_SIX
 from hard_prompt.agent_iterat_improver import PROMPT_SEVEN
 from hard_prompt.agent_exception_catcher import PROMPT_EIGHT
+from hard_prompt.auto_research_prompt_patch import (
+    PROMPT_AUTO_RESEARCH_PATCH_PERFORMANCE_PROBE_IMPLEMENTATION_AND_INTEGRATION,
+    PROMPT_AUTO_RESEARCH_PATCH_ITERATION_IMPROVEMENT,
+)
 import json
 import subprocess
 from datetime import datetime
@@ -222,6 +226,14 @@ def action_4_iterate():
     _agent_call(PROMPT_SEVEN)
 
 
+def action_auto_research_probe_setup():
+    _agent_call(PROMPT_AUTO_RESEARCH_PATCH_PERFORMANCE_PROBE_IMPLEMENTATION_AND_INTEGRATION)
+
+
+def action_auto_research_iterate():
+    _agent_call(PROMPT_AUTO_RESEARCH_PATCH_ITERATION_IMPROVEMENT)
+
+
 def action_run_training() -> tuple[bool, str]:
     result = subprocess.run(
         ["python", "train.py"],
@@ -320,7 +332,7 @@ def _setup_run() -> tuple[Path, Progressbar]:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    global USER_ANSWER_ONE, USER_ANSWER_TWO, USER_ANSWER_THREE, USER_ANSWER_FOUR, RESPONSE_DIR
+    global RESPONSE_DIR
 
     run_dir, pb = _setup_run()
     RESPONSE_DIR = run_dir
@@ -344,7 +356,24 @@ def main():
     if not snapshot_v0.exists():
         snapshot_v0.write_text((Path(WROKING_SPACE) / "train.py").read_text())
 
-    # ── Step 2: project context ────────────────────────────────────────────────
+    # ── Step 2: auto-research feature choice (one upfront switch) ──────────────
+    if not pb.is_done("auto_research_choice"):
+        use_auto_research = _ask_yn(QUESTION_SIX, default=False)
+        pb.mark("auto_research_choice", use_auto_research)
+    else:
+        use_auto_research = pb.get_answer("auto_research_choice")
+        print(f"[Resume] Auto-research: {'enabled' if use_auto_research else 'skipped'}.")
+
+    if use_auto_research:
+        _run_auto_research_pipeline(pb)
+    else:
+        _run_normal_pipeline(pb)
+
+
+def _run_normal_pipeline(pb: Progressbar) -> None:
+    global USER_ANSWER_ONE, USER_ANSWER_TWO, USER_ANSWER_THREE, USER_ANSWER_FOUR
+
+    # ── Project context ───────────────────────────────────────────────────────
     if not pb.is_done("project_context"):
         USER_ANSWER_ONE = get_input_placeholder(QUESTION_ONE).strip()
         pb.mark("project_context", USER_ANSWER_ONE)
@@ -399,22 +428,6 @@ def main():
         if not pb.is_done(f"{cp}/exception_check_1"):
             action_x_agentic_exception_catcher()
             pb.mark(f"{cp}/exception_check_1")
-
-        # Optional commentor
-        if not pb.is_done(f"{cp}/comment_confirm"):
-            do_comment = _ask_yn(QUESTION_SIX, default=False)
-            pb.mark(f"{cp}/comment_confirm", do_comment)
-        else:
-            do_comment = pb.get_answer(f"{cp}/comment_confirm")
-            print(f"[Resume] Comment step: {'enabled' if do_comment else 'skipped'}.")
-
-        if do_comment:
-            if not pb.is_done(f"{cp}/improvement"):
-                action_4_agent_improvement()
-                pb.mark(f"{cp}/improvement")
-            if not pb.is_done(f"{cp}/exception_check_2"):
-                action_x_agentic_exception_catcher()
-                pb.mark(f"{cp}/exception_check_2")
 
         # Iteration count
         if not pb.is_done(f"{cp}/iter_count"):
@@ -482,6 +495,74 @@ def main():
             print("Warning: train_version_0.py not found — train.py not reverted.")
 
         cycle += 1
+
+
+def _run_auto_research_pipeline(pb: Progressbar) -> None:
+    global USER_ANSWER_FOUR
+
+    agent_probe_dir = Path(WROKING_SPACE) / ".agent_probe"
+    prober_path = Path(WROKING_SPACE) / "prober.py"
+
+    # Agent picks a standard performance metric, writes prober.py, integrates with train.py.
+    if not pb.is_done("ar/probe_setup") or not prober_path.exists():
+        action_auto_research_probe_setup()
+        pb.mark("ar/probe_setup")
+
+    # Run training to validate the integration and produce probe_result_1.
+    if not pb.is_done("ar/exception_check_1"):
+        action_x_agentic_exception_catcher()
+        pb.mark("ar/exception_check_1")
+
+    # Commentor adds 10 # potential_improvement_N: comments to train.py.
+    if not pb.is_done("ar/comment"):
+        action_4_agent_improvement()
+        pb.mark("ar/comment")
+
+    # Comments alone shouldn't break training, but keep parity with the normal flow.
+    if not pb.is_done("ar/exception_check_2"):
+        action_x_agentic_exception_catcher()
+        pb.mark("ar/exception_check_2")
+
+    # Iteration count
+    if not pb.is_done("ar/iter_count"):
+        USER_ANSWER_FOUR = _ask_pos_int(QUESTION_FOUR, default=3)
+        pb.mark("ar/iter_count", USER_ANSWER_FOUR)
+    else:
+        USER_ANSWER_FOUR = pb.get_answer("ar/iter_count")
+        print(f"[Resume] Iteration count: {USER_ANSWER_FOUR}.")
+
+    # change_log_1 is the baseline marker (no agent changes for the first run).
+    change_log_1 = agent_probe_dir / "change_log_1.txt"
+    change_log_1.parent.mkdir(parents=True, exist_ok=True)
+    if not change_log_1.exists():
+        change_log_1.write_text("")
+
+    if _probe_passed():
+        print("Probe already passed before iteration loop — skipping improvement iterations.")
+    else:
+        remaining = USER_ANSWER_FOUR
+        iter_idx = 0
+        while remaining > 0:
+            ip = f"ar/iter_{iter_idx}"
+            if not pb.is_done(f"{ip}/improve"):
+                # Snapshot train.py as train_version_{iter_idx+1} before the agent
+                # modifies it. Numbering aligns with probe_result_N (same convention as normal mode).
+                train_src = Path(WROKING_SPACE) / "train.py"
+                snapshot_dst = agent_probe_dir / "snapshot" / f"train_version_{iter_idx + 1}.py"
+                snapshot_dst.parent.mkdir(parents=True, exist_ok=True)
+                snapshot_dst.write_text(train_src.read_text())
+                action_auto_research_iterate()
+                pb.mark(f"{ip}/improve")
+            if not pb.is_done(f"{ip}/exception_check"):
+                action_x_agentic_exception_catcher()
+                pb.mark(f"{ip}/exception_check")
+            remaining -= 1
+            iter_idx += 1
+            if _probe_passed():
+                print("Probe status: PASS — stopping iterations early.")
+                break
+
+    print("Auto-research pipeline finished. Goodbye!")
 
 
 if __name__ == "__main__":

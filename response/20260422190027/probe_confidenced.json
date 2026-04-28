@@ -1,0 +1,116 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "data",
+      "probe_name": "Per-Attribute Label Prevalence and Class Imbalance Audit",
+      "content": "Compute the positive-class prevalence P(y_k=1) for each of the 40 CelebA attributes on train/val/test splits. CelebA is notoriously imbalanced (e.g., Bald ~2%, Mustache ~4%, Young ~78%, No_Beard ~83%). Verify that prevalence distributions match across splits, and flag any attribute with <5% or >95% positive rate as high-risk for trivial-majority prediction. Healthy: split prevalences match within \u00b11% and loss weighting / pos_weight in BCEWithLogitsLoss accounts for imbalance. Unhealthy: large prevalence drift across splits, or per-attribute accuracy \u2248 majority baseline for rare attributes, indicating the model learned to always predict negative.",
+      "possible_sources": [
+        "Liu et al., 'Deep Learning Face Attributes in the Wild' (ICCV 2015) \u2014 original CelebA paper with attribute statistics",
+        "Rudd et al., 'MOON: A Mixed Objective Optimization Network for the Recognition of Facial Attributes' (ECCV 2016)",
+        "Hand & Chellappa, 'Attributes for Improved Attributes' (AAAI 2017)"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "fairness",
+      "probe_name": "Demographic Subgroup Fairness on Male/Young/Pale_Skin Slices",
+      "content": "Evaluate per-attribute accuracy, TPR, FPR, and F1 conditional on protected attributes (Male, Young, Pale_Skin as proxies for gender, age, skin tone). Compute equalized-odds gaps (|TPR_male - TPR_female|, etc.) for each of the remaining attributes. Healthy: subgroup disparities < 5% on most attributes; disparities on attributes like Attractive, Heavy_Makeup, Wearing_Lipstick are acknowledged as label-correlated. Unhealthy: systematic gaps >10% for non-gender-correlated attributes (e.g., Eyeglasses, Smiling, Blurry), indicating spurious demographic shortcuts.",
+      "possible_sources": [
+        "Buolamwini & Gebru, 'Gender Shades' (FAT* 2018)",
+        "Denton et al., 'Image Counterfactual Sensitivity Analysis for Detecting Unintended Bias' (CVPR-W 2019)",
+        "Ramaswamy et al., 'Fair Attribute Classification through Latent Space De-biasing' (CVPR 2021)",
+        "FairFace benchmark (K\u00e4rkk\u00e4inen & Joo, WACV 2021)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Per-Attribute Sigmoid Probability Calibration (ECE/Reliability)",
+      "content": "For each of the 40 attributes, bin predicted sigmoid probabilities and plot reliability diagrams; compute Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Brier score per attribute and macro-averaged. BCEWithLogitsLoss is a proper scoring rule but deep nets tend to be over-confident. Healthy: per-attribute ECE < 0.05, well-aligned reliability curve near the y=x diagonal. Unhealthy: ECE > 0.1 or systematic over-confidence on rare attributes (Bald, Mustache), suggesting temperature scaling or focal loss is needed.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks' (ICML 2017)",
+        "Naeini et al., 'Obtaining Well Calibrated Probabilities Using Bayesian Binning' (AAAI 2015)",
+        "Kull et al., 'Beta calibration' (AISTATS 2017)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train/Val/Test Loss and mAP Gap Analysis",
+      "content": "Track per-epoch training BCE loss, validation BCE loss, mean Average Precision (mAP) across the 40 attributes, and mean per-attribute accuracy. Compute the generalization gap = train_metric - val_metric. Healthy: smooth monotonic decrease of both losses, val loss plateaus within 1-2% of train loss, mAP > 0.75 (strong baselines hit ~0.79 mAP on CelebA). Unhealthy: divergence after early epochs (overfitting), noisy val curve (instability/LR too high), or plateau at a low value (underfitting or bad backbone choice).",
+      "possible_sources": [
+        "Han et al., 'Heterogeneous Face Attribute Estimation: A Deep Multi-Task Learning Approach' (TPAMI 2018)",
+        "He et al., 'Harnessing Synthesized Abstraction Images to Improve Facial Attribute Recognition' (IJCAI 2018)",
+        "Timm library reported baselines on CelebA"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Robustness to Image Corruptions and Face Occlusions",
+      "content": "Evaluate the model on CelebA test images perturbed with common corruptions (Gaussian noise, blur, JPEG, brightness/contrast shifts \u2014 ImageNet-C style) and synthetic occlusions (random masks on eyes, mouth, forehead). Measure per-attribute accuracy delta vs. clean. Healthy: graceful degradation (<10% absolute drop at moderate severity); occluding the eye region primarily hurts Eyeglasses, Narrow_Eyes, Bags_Under_Eyes without cascading to unrelated attributes. Unhealthy: catastrophic drops (>25%) on multiple attributes under mild perturbation, or occluding unrelated regions destroys predictions, suggesting non-localized / spurious features.",
+      "possible_sources": [
+        "Hendrycks & Dietterich, 'Benchmarking Neural Network Robustness to Common Corruptions and Perturbations' (ICLR 2019)",
+        "Geirhos et al., 'ImageNet-trained CNNs are biased towards texture' (ICLR 2019)",
+        "DeVries & Taylor, 'Improved Regularization of CNNs with Cutout' (2017)"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Label-Correlation Shortcut Detection via Counterfactual Attribute Editing",
+      "content": "Identify known-correlated attribute pairs in CelebA (Male\u2194No_Beard, Male\u2194Wearing_Lipstick, Heavy_Makeup\u2194Wearing_Lipstick, Young\u2194Gray_Hair). Use counterfactual edits (e.g., StyleGAN-based or simple image hair recoloring) or counterfactual test sets (CelebA-HQ counterfactuals) to change one attribute while holding others constant, and check whether predictions for supposedly independent attributes flip. Healthy: editing Wearing_Lipstick does not change the Male prediction when the face is otherwise identical. Unhealthy: high 'attribute leakage' where changing one attribute flips several others, indicating the model exploits spurious correlations instead of localized evidence.",
+      "possible_sources": [
+        "Denton et al., 'Image Counterfactual Sensitivity Analysis' (CVPR-W 2019)",
+        "Joo & K\u00e4rkk\u00e4inen, 'Gender Slopes: Counterfactual Fairness for Computer Vision' (AAAI-W 2020)",
+        "Ramaswamy et al., 'Fair Attribute Classification through Latent Space De-biasing' (CVPR 2021)"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Grad-CAM / Saliency Localization per Attribute",
+      "content": "For a stratified sample of test images, compute Grad-CAM or Integrated Gradients heatmaps for each attribute logit and overlay on the face. Compare hot regions against semantic expectations using CelebA landmark annotations: Eyeglasses/Narrow_Eyes should concentrate around eyes; Mustache/Goatee around mouth/chin; Wearing_Hat above forehead. Quantify with pointing-game accuracy or IoU against attribute-relevant facial regions. Healthy: >70% of saliency mass lies in the semantically-correct facial region. Unhealthy: diffuse or off-face saliency (background, clothing) suggests the model uses spurious context cues.",
+      "possible_sources": [
+        "Selvaraju et al., 'Grad-CAM' (ICCV 2017)",
+        "Sundararajan et al., 'Integrated Gradients' (ICML 2017)",
+        "Zhang et al., 'Top-down Neural Attention by Excitation Backprop' (ECCV 2016) \u2014 pointing game"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "probe_type": "efficiency",
+      "probe_name": "Per-Attribute Loss Contribution and Gradient Magnitude Balance",
+      "content": "Because BCEWithLogitsLoss sums across the 40 attributes, high-prevalence easy attributes (Male, No_Beard, Young) may dominate gradients and starve rare ones. Log per-attribute mean loss and per-attribute gradient-norm contribution during training. Healthy: per-attribute loss contributions within an order of magnitude of each other; rare attributes (Bald, Mustache) still receive meaningful gradient signal. Unhealthy: the 5 most prevalent attributes contribute >50% of gradient norm, correlated with stagnating val AP on rare classes \u2014 motivates pos_weight, focal loss, or class-balanced sampling.",
+      "possible_sources": [
+        "Lin et al., 'Focal Loss for Dense Object Detection' (ICCV 2017)",
+        "Cui et al., 'Class-Balanced Loss Based on Effective Number of Samples' (CVPR 2019)",
+        "Rudd et al., MOON (ECCV 2016)"
+      ],
+      "confidence": 0.78
+    },
+    {
+      "probe_type": "threshold-selection",
+      "probe_name": "Per-Attribute Decision Threshold Optimization vs Fixed 0.5",
+      "content": "The default threshold of 0.5 is optimal only for calibrated, balanced classes. Sweep thresholds per attribute on the val set and find the threshold maximizing F1 (or Youden's J). Report the delta between val F1 at 0.5 vs. the per-attribute optimum on both val and test. Healthy: optimal thresholds cluster near 0.5 (0.4\u20130.6), improvement from tuning is small (<2% macro F1), implying well-calibrated outputs. Unhealthy: optimal thresholds scatter widely (e.g., 0.1 for Bald, 0.8 for Young) with >5% macro-F1 gain, indicating calibration issues and that reported accuracy at 0.5 is misleading.",
+      "possible_sources": [
+        "Lipton et al., 'Optimal Thresholding of Classifiers to Maximize F1 Measure' (ECML PKDD 2014)",
+        "Koyejo et al., 'Consistent Binary Classification with Generalized Performance Metrics' (NeurIPS 2014)",
+        "Rudd et al., MOON (ECCV 2016) \u2014 per-attribute threshold tuning on CelebA"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "probe_type": "distribution-shift",
+      "probe_name": "Out-of-Distribution Generalization to LFWA / UTKFace / In-the-Wild Faces",
+      "content": "Since CelebA is biased toward frontal, well-lit celebrity faces, evaluate the trained model zero-shot on LFWA (Labeled Faces in the Wild with attributes) for the overlapping subset of attributes, and optionally on FairFace / UTKFace for demographic-balanced evaluation. Compare per-attribute accuracy on CelebA-test vs. LFWA. Healthy: <10% absolute accuracy drop on attributes that transfer (Male, Eyeglasses, Smiling, Wearing_Hat). Unhealthy: >20% drop, particularly on demographic-correlated attributes, indicating the model overfits the CelebA distribution (celebrity aesthetic bias, lighting, pose).",
+      "possible_sources": [
+        "Huang et al., 'Labeled Faces in the Wild' tech report (UMass 2007) + LFWA attributes (Kumar et al., ICCV 2009)",
+        "K\u00e4rkk\u00e4inen & Joo, 'FairFace' (WACV 2021)",
+        "Zhang et al., 'UTKFace' dataset (CVPR 2017)",
+        "Recht et al., 'Do ImageNet Classifiers Generalize to ImageNet?' (ICML 2019) \u2014 methodology"
+      ],
+      "confidence": 0.85
+    }
+  ]
+}

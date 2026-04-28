@@ -1,0 +1,63 @@
+Iteration 6 changes (cooccur_delta_frobenius probe; threshold 0.15; lower is better)
+
+Step 0 comparison:
+  probe_result_5 tail_mean = 0.1924 (FAIL)
+  probe_result_4 tail_mean = 0.4948 (FAIL)
+Iter 5 made the metric MUCH better (0.4948 -> 0.1924) by restoring the iter-3
+baseline and adding a CosineAnnealingLR schedule. No revert needed: current
+train.py is identical to snapshot train_version_4.py, and iter 5's change in
+lightningmodules/classification.py (CosineAnnealingLR with eta_min=lr*0.01)
+stays in place.
+
+Diagnosis of the remaining gap (0.1924 -> <=0.15):
+The iter-5 curve descends smoothly from 0.47 to ~0.20 by epoch 20 and settles
+in the 0.18-0.20 band for the last 10 epochs, with min 0.1834 at epoch 24.
+The cosine LR decay already tamed per-epoch oscillation (std 0.060 across the
+run, but tail-5 values are tightly clustered around 0.19). The remaining
+~0.04 gap is a *fit* problem, not a noise problem: the model still isn't
+learning rare-attribute decision boundaries well enough for their
+correlation rows/columns in P_pred to match P_train's.
+
+At limit_train_batches=0.02 and batch_size=32, each epoch sees
+~0.02 * ~162770 = ~3255 training samples. CelebA's rarest attributes (Bald
+~2.2%, Mustache ~4.2%, Gray_Hair ~4.2%) thus get only ~70-140 positive
+examples per epoch. That is far too few for the Adam optimizer to shape
+their logits to cross 0.5 on the validation split -- which is what the
+probe requires to get their P_pred columns out of the near-constant
+"never fires" regime.
+
+Iter 4 tried to solve exactly this by pos-weighting the BCE loss, and the
+aggressive pos_weight (clamp<=15) backfired: logits flipped from
+"never fires" to "fires way too much", distorting the correlation in the
+opposite direction and producing a catastrophic tail_mean=0.49. That path
+is now ruled out.
+
+The analogous, safer lever is more data exposure per epoch. Iter 2's
+biggest single win came from raising limit_train_batches 0.002 -> 0.02
+(10x). Pushing it a further 2.5x (0.02 -> 0.05) is the same class of
+intervention, at a much smaller relative step, and does not touch the
+loss function or optimizer dynamics.
+
+Change (one coherent intervention in hparams.py):
+
+1. Hparams.limit_train_batches: 0.02 -> 0.05 (2.5x).
+   Why: Each epoch will now see ~8140 training samples, giving the rare
+   attributes ~180-340 positives per epoch -- enough for Adam with the
+   existing 5e-5 LR and cosine schedule to learn a decision boundary
+   that generalizes to the val set with a non-degenerate column in
+   P_pred. Because the cosine schedule is parameterized by T_max=epochs
+   (not steps), the per-epoch LR curve is unchanged, so the improved
+   per-epoch convergence compounds into a tighter tail_mean rather
+   than more oscillation.
+
+No other files were modified. Kept: Adam, unweighted BCEWithLogitsLoss,
+no weight decay, CosineAnnealingLR(T_max=30, eta_min=lr*0.01),
+HorizontalFlip p=0.5, ColorJitter (0.2, 0.2, 0.2, 0.05), lr=5e-5,
+max_epochs=30, batch_size=32.
+
+Step 6 verification: In train.py line 41 `record` is still registered as a
+Callback and line 76 still calls `conclude(0.15)`. Neither line was
+modified. validation_step in lightningmodules/classification.py still
+returns {"logits": logits}, the exact shape/type the prober's
+on_validation_batch_end hook expects. The threshold argument to
+conclude() is unchanged (0.15). prober.py was not touched.

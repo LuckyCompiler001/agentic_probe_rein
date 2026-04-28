@@ -1,0 +1,60 @@
+{
+  "metric_name": "cooccur_delta_frobenius",
+  "threshold": 0.15,
+  "values": [
+    {
+      "epoch": 0,
+      "value": 0.7872238578913497
+    },
+    {
+      "epoch": 1,
+      "value": 0.7325434658221641
+    },
+    {
+      "epoch": 2,
+      "value": 0.7057451742130681
+    },
+    {
+      "epoch": 3,
+      "value": 0.7446623405707801
+    },
+    {
+      "epoch": 4,
+      "value": 0.7961153869163742
+    },
+    {
+      "epoch": 5,
+      "value": 0.8200735437200645
+    },
+    {
+      "epoch": 6,
+      "value": 0.8357175508103805
+    },
+    {
+      "epoch": 7,
+      "value": 0.8229447234855439
+    },
+    {
+      "epoch": 8,
+      "value": 0.7991959995444454
+    },
+    {
+      "epoch": 9,
+      "value": 0.783515422801171
+    },
+    {
+      "epoch": 10,
+      "value": 0.7629608011897352
+    }
+  ],
+  "min": 0.7057451742130681,
+  "max": 0.8357175508103805,
+  "mean": 0.7809725697240979,
+  "std": 0.03877897686355058,
+  "first_value": 0.7872238578913497,
+  "final_value": 0.7629608011897352,
+  "delta": -0.02426305670161455,
+  "tail_mean": 0.8008668995662551,
+  "status": "FAIL",
+  "conclusion": "cooccur_delta_frobenius decreased from 0.7872 to 0.7630 over 11 epoch(s), never crossing below the 0.150 threshold; tail mean 0.8009 exceeds the 0.150 bound (FAIL)."
+}

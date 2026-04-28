@@ -1,0 +1,42 @@
+Iteration 2 changes (cooccur_delta_frobenius probe; threshold 0.15; lower is better)
+
+Prior result: tail_mean=0.8009 (FAIL). Curve started at 0.787, dipped to 0.706 (epoch 2),
+then climbed back to 0.836 (epoch 6) before settling near 0.76 — classic signature of
+severe under-training, where after a brief partial-fit the model collapses on imbalanced
+attributes and predictions become near-uniform noise. Binarized noisy predictions have a
+near-trivial correlation matrix that cannot match the rich joint structure of the
+training labels, hence the large Frobenius gap.
+
+Note: probe_result_1 was a different metric (Mean Demographic Parity Gap), so no
+comparison/revert was applicable. change_log_1.txt was empty (first real tuning round).
+
+Changes (one coherent intervention: enable the model to actually learn the joint
+attribute structure):
+
+1. hparams.py — TrainParams.lr: 1e-5 -> 5e-5 (5x).
+   Why: With a pretrained ViT-small, 1e-5 is too low to make meaningful adjustments
+   in only ~10 epochs of tiny-batch training. 5e-5 is a standard fine-tuning LR for
+   ViTs and lets the head learn the 40-attribute joint distribution faster.
+
+2. hparams.py — Hparams.limit_train_batches: 0.002 -> 0.02 (10x).
+   Why: At 0.002 the model sees ~320 samples per epoch (10 batches). That is far too
+   few to estimate the 40x40 joint label structure. 10x more samples per epoch gives
+   the optimizer enough signal to fit the imbalanced rare attributes (e.g. Bald,
+   Mustache) instead of collapsing them to constant outputs that flatten the
+   prediction correlation matrix.
+
+3. datamodules/celebadatamodule.py — removed RandomVerticalFlip(p=0.4); kept
+   RandomHorizontalFlip but raised to standard p=0.5; reduced ColorJitter strengths
+   (brightness/contrast/saturation 0.4 -> 0.2, hue 0.2 -> 0.05).
+   Why: Vertical-flipping faces destroys a strong natural prior — it essentially
+   doubles the apparent label noise on attributes tied to face geometry (eyes, smile,
+   hair location, accessories). Removing it and softening color jitter lets the
+   pretrained ViT features generalize from train labels to validation predictions
+   in a way that preserves the same pairwise attribute correlations.
+
+Also: changed the `lr` annotation in TrainParams from `int` to `float` (it was always
+a float at runtime; the annotation was inconsistent and would mislead any code that
+introspects type hints).
+
+Did not touch prober.py. The `record` callback registration and the `conclude(0.15)`
+call in train.py remain exactly as they were.
