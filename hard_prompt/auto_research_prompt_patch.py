@@ -74,11 +74,23 @@ Your job for THIS iteration is simple and strict: pick exactly ONE of those comm
 
 Important: this is a PERFORMANCE-MONITORING probe. There is NO threshold and NO pass/fail. You always make exactly one targeted change this iteration — never no-op, never "stop early because the metric is good enough". The orchestrator decides when iterations end, not you.
 
-Equally important: do NOT try to fix everything at once or swing a parameter all the way to its ideal value in a single iteration. Many rounds are scheduled — each round contributes a small step. Be conservative:
-- If a comment suggests increasing a parameter, take a moderate step toward the suggested target (e.g. 2x-5x of the current value, or partway toward what the comment names) rather than the full jump in one go.
-- If a comment suggests turning on an expensive feature flag (e.g. `INCLUDE_AUXILIARY = True`), that single boolean toggle counts as one change — apply it cleanly without simultaneously rewriting other parameters.
-- Never combine the change suggested by your chosen comment with edits to any other comment's referenced code. One comment, one targeted edit.
-- A small, safe change that nudges the metric in the right direction is the goal. Aggressive changes that risk overshooting and forcing a revert in the next round waste an iteration.
+One-comment, one-edit rule (never relax this): the only constraint that always applies is "do not combine the comment you chose with edits to any other comment's referenced code". You touch ONE comment's referenced code per iteration. Nothing else.
+
+Step size depends on the regime — read the latest probe_result JSON before deciding:
+
+**Regime A: metric is at or near random baseline** (e.g. ROC-AUC ≈ 0.50, accuracy ≈ majority-class prior, F1 ≈ 0, RMSE ≈ a naive constant-predictor's RMSE). The model is in a DEGENERATE state — at least one parameter is so far outside reasonable territory that no learning is happening. Several parameters are likely crippling at once, so a small partial step on any single one will fail to break out and the metric stays flat for the next round too (a wasted iteration).
+- Apply the comment's named target value in FULL. If the comment names a specific value, move to that value. If the comment names a range (e.g. "raise NUM_LEAVES to 31-127"), move to the value most likely to escape the degenerate regime (typically the more impactful end for the current metric direction, e.g. higher capacity if the model is too weak).
+- Do not water the comment down. Half-measures in this regime are the failure mode.
+
+**Regime B: metric has clearly moved off baseline and is climbing or has plateaued above baseline.** The model is learning; the goal is now refinement.
+- Take a moderate step toward the comment's target — roughly 2x-5x the current value for a hyperparameter, or about half the distance toward the comment's named value if it specifies one.
+- Aggressive moves risk overshooting and forcing a revert next round.
+
+**Always-fully-applied changes (in BOTH regimes):**
+- Boolean toggles (e.g. `INCLUDE_AUXILIARY = True`, `USE_STRATIFY = True`, `DUMMY_NA = True`). Flip them in one move.
+- Categorical / discrete choices (e.g. `BOOSTING_TYPE='rf' → 'gbdt'`, switching optimizer, switching loss). Set them to the recommended option directly.
+- Removing or disabling a clearly-broken cap or guard (e.g. `TRAIN_ROW_LIMIT = None` when it caps to a tiny fraction of the data, `MIN_DATA_IN_LEAF` larger than the training set). Set the value to the sane setting in one move; do not "partially uncap".
+- Comically-bad current values that are degenerate by themselves (e.g. learning_rate ≥ 0.5 on GBDT, n_estimators ≤ 20 with no early-stopping, regularization coefficients ≥ 50, subsample/colsample ≤ 0.1). Move directly to a sensible value the comment names — the 2x-5x rule does not apply here.
 
 Step 0 — Regression revert check
 Count the files in `.agent_probe/metric/`. Call that count N (e.g. 2 files → N = 2).

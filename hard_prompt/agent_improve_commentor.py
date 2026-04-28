@@ -26,7 +26,7 @@ For each of the 10 places, insert an inline comment on the relevant line (or the
 
 Rules:
 - Do not change any existing code — only add comment lines
-- Each comment must be specific: name the technique, parameter, or pattern to change, and explain how the change is expected to move the metric in the better direction
+- Each comment must name a CONCRETE target value or a tight target range (e.g. "set LEARNING_RATE to 0.03-0.05", "raise NUM_LEAVES to 63-127", "set INCLUDE_AUXILIARY = True", "switch BOOSTING_TYPE from 'rf' to 'gbdt'"). Vague directional language ("consider increasing", "tune this", "experiment with") is FORBIDDEN — the iteration agent acts on the value you name, so without a specific target the comment is useless.
 - Spread the 10 comments across different parts of the file (data loading / preprocessing, model definition, optimiser / training loop, validation / split logic) — do not cluster them in one section
 - Do not annotate places that are already obviously correct and have no performance-relevant room for improvement
 - No stylistic, readability, naming, typing, docstring, refactoring, logging, or organisational comments — those are explicitly forbidden
