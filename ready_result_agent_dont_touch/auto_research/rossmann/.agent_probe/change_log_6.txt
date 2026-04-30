@@ -1,0 +1,12 @@
+Iteration 6 change log
+=======================
+
+Step 0 revert: NO. probe_result_5 tail_mean=2508.9880 was an improvement over probe_result_4 tail_mean=2758.5671 (lower_is_better, so a lower tail_mean is better). Iteration 5's lowering of LEARNING_RATE from 0.4 to 0.2 helped — keep it.
+
+Chosen item: potential_improvement_1
+
+Change: Set MAX_TRAIN_ROWS from 50000 to 0 in train.py (line 41), which disables the head-truncation in main() (the guard `if 0 < MAX_TRAIN_ROWS < len(train_frame)` becomes false and the full training frame is used).
+
+Why this should lower validation RMSE: ~1M rows are available in the Rossmann train.csv, but MAX_TRAIN_ROWS=50000 was head-truncating to the first 50k chronologically. Combined with the existing TRAIN_DOWNSAMPLE_STRIDE=5 and VALID_RATIO=0.6, the model was actually fitting only ~4k rows of an early time slice — far too little signal for LightGBM to drive RMSE down further (probe_result_5 plateaued around 2506-2515 over the last 10 rounds, classic data-starvation symptom). Disabling the cap exposes the model to the full ~1M-row history (~80k effective training rows after the existing stride and validation split), which should reduce validation RMSE materially. This is an "always-fully-applied" change — removing a clearly-broken cap that throws away >95% of the available data — so per the rules I set the value directly to 0 in one move rather than partially uncapping.
+
+Other 9 potential_improvement_* items left untouched. record() and conclude() call sites in train.py confirmed unmodified; record(epoch_idx, rmse_value) still resolves to int+float, and conclude() is still called with no arguments.

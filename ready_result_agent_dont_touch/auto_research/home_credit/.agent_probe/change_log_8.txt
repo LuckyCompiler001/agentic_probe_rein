@@ -1,0 +1,25 @@
+Iteration 8 change log
+=======================
+
+Chosen item: potential_improvement_9
+
+Change: Raised NUM_LEAVES from 8 to 31 and MAX_DEPTH from 4 to -1, lifting
+the capacity cap that was hard-binding the model. NUM_LEAVES=31 lands at
+the low end of the comment's recommended 31-63 range (~4x the previous
+value, a moderate Regime B step), and MAX_DEPTH=-1 removes the depth cap
+so leaves become the sole structural constraint per standard LightGBM
+practice.
+
+Why this is expected to lift validation ROC-AUC: probe_result_7 shows the
+curve plateauing in the 0.7770-0.7773 band from ~epoch 155 onward despite
+N_ESTIMATORS=250, early-stopping, and the auxiliary tables now in place.
+With ~600+ engineered features (application + bureau/PREV/POS/INSTAL/CC
+aggregates) the model has rich interactions to capture, but MAX_DEPTH=4
+allows at most 2^4=16 leaves and NUM_LEAVES=8 caps it tighter still — the
+trees cannot represent multi-feature interactions beyond depth 4. Raising
+the capacity cap is the standard remedy for a learning-curve plateau when
+the rest of the pipeline (data, features, rounds, LR) is sound.
+
+Step 0 revert: Not performed. probe_result_7 tail_mean (0.7772) is much
+higher than probe_result_6 tail_mean (0.7561) for higher_is_better, so the
+previous iteration was a clear improvement, not a regression.

@@ -1,0 +1,10 @@
+Iteration 9 change log
+======================
+
+Step 0 — Regression revert check: N = 8. probe_result_8 tail_mean (0.8536) is LOWER than probe_result_7 tail_mean (0.8744). Direction is higher_is_better, so the most recent run is WORSE. Iteration 8's change (LEARNING_RATE 0.3 → 0.1) hurt the metric. Restored train.py from .agent_probe/snapshot/train_version_5.py (the snapshot whose run produced probe_result_7), which restores LEARNING_RATE = 0.3 and keeps USE_IDENTITY_FEATURES = True. (Note: the literal snapshot named train_version_{N-1}.py = train_version_7.py does not exist; v5 is the saved snapshot whose run produced probe_result_7 based on timestamps and content, so it is the correct revert target.)
+
+Chosen item: potential_improvement_5
+
+Exact change: Set FILLNA_VALUE from 0.0 to np.nan so the trainer no longer overwrites missing values with 0 and instead lets LightGBM use its native missing-value handling.
+
+Rationale: The IEEE-CIS fraud dataset has heavy, informative missingness across V*, D*, M*, and identity columns; replacing NaN with 0.0 collides with the many real zeros in those columns and destroys the missingness signal LightGBM would otherwise learn an optimal split direction for. FILLNA_VALUE is a discrete/categorical choice (always-fully-applied per the rules), so it is moved straight to the comment's named target (np.nan) in one move. Expected to lift validation ROC-AUC in the better (higher) direction by recovering signal that was being clobbered.

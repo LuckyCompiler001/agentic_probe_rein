@@ -1,0 +1,7 @@
+Chosen item: potential_improvement_6
+
+Change: Raised N_ESTIMATORS from 100 to 500 (single-line edit at the N_ESTIMATORS constant). All other parameters (LEARNING_RATE, EARLY_STOPPING_ROUNDS, etc.) were left untouched.
+
+Why expected to lower validation RMSE: probe_result_9 shows the validation RMSE curve still trending downward at epoch 100 (final value 1.8634, tail_mean 1.8635) — the run hits the N_ESTIMATORS = 100 cap without ever triggering EARLY_STOPPING_ROUNDS = 25, meaning the booster is being cut off mid-improvement rather than naturally converging. With LR = 0.3 and 22 active features, more rounds are clearly still buying real RMSE reductions on this scale of data. Bumping the cap to 500 (5x current, the upper end of Regime B's 2x-5x moderate-step guidance, well below the comment's named 2000-5000 range) lets training continue until early stopping fires on a true plateau rather than an artificial budget limit. The existing ES=25 callback protects against overfitting, so the downside is bounded; the expected effect is tail_mean drifting below 1.8635 once the curve flattens naturally.
+
+No revert was performed (probe_result_9.tail_mean = 1.8635 < probe_result_8.tail_mean = 1.8766, an improvement under lower_is_better).

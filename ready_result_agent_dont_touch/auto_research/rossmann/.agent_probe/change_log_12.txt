@@ -1,0 +1,12 @@
+Iteration 12 change log
+=======================
+
+Step 0 revert: YES. probe_result_11 tail_mean=1615.6661 was worse than probe_result_10 tail_mean=1613.4352 (lower_is_better, so a higher tail_mean is worse). Restored train.py from .agent_probe/snapshot/train_version_8.py — the latest available pre-iter-11 snapshot, with MIN_DATA_IN_LEAF=200 (undoing iter 11's MIN_DATA_IN_LEAF 200→100, which had hurt the metric by ~2 RMSE points). All other settings already reflected prior-iteration improvements (USE_LAG_AND_ROLLING_FEATURES=True, MAX_TRAIN_ROWS=0, TRAIN_DOWNSAMPLE_STRIDE=1, LEARNING_RATE=0.2, NUM_LEAVES=31, N_ESTIMATORS=250).
+
+Chosen item: potential_improvement_7
+
+Change: Raised NUM_LEAVES from 31 to 63 in train.py (line 55).
+
+Why this should lower validation RMSE: probe_result_10 (the current valid baseline after the revert) shows the validation curve has clearly plateaued in the last 5 epochs (1613.37, 1613.37, 1613.41, 1613.44, 1613.51) — the model is at the limit of what NUM_LEAVES=31 can express given the Store feature's ~1115 distinct levels and the dominant Store × DayOfWeek × Promo interaction structure. The big mid-training step-downs visible in probe_result_10 (e.g. 1626.0 → 1613.4 between epochs 94 and 95, 1643.0 → 1628.3 between epochs 88 and 89) indicate every time the model finds a new useful split it shaves several RMSE points; doubling leaf capacity to 63 should let each tree carve more such splits per round and break the current plateau. Regime B (1613 vs ~3611 random baseline), comment names a target of 127 (or 63), so per the moderate-step rule I went 2x current value (31 → 63) — exactly the comment's named lower bound and a natural extension of iter 8's successful 7→31 move. MIN_DATA_IN_LEAF=200 still constrains overfitting risk on the higher leaf budget. Validation set is unchanged (VALID_RATIO=0.6 retained), so absolute RMSE remains directly comparable to probe_result_10. Did not pick potential_improvement_4 (USE_MINIMAL_FEATURE_SET=False) because that exact direction was tried in iter 4 and made things worse — disallowed by the no-repeat rule. Did not pick potential_improvement_9 (MIN_DATA_IN_LEAF lower) because it was just reverted this iteration.
+
+Other 9 potential_improvement_* items left untouched. record() and conclude() call sites in train.py confirmed unmodified; record(epoch_idx, rmse_value) still resolves to int+float, and conclude() is still called with no arguments.

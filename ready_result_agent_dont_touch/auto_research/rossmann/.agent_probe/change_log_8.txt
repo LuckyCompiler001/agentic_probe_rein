@@ -1,0 +1,12 @@
+Iteration 8 change log
+=======================
+
+Step 0 revert: NO. probe_result_7 tail_mean=1641.1242 was a strong improvement over probe_result_6 tail_mean=1932.5768 (lower_is_better, so a lower tail_mean is better). Iteration 7's raising of N_ESTIMATORS from 50 to 250 helped substantially — keep it.
+
+Chosen item: potential_improvement_7
+
+Change: Raised NUM_LEAVES from 7 to 31 in train.py (line 55).
+
+Why this should lower validation RMSE: With USE_MINIMAL_FEATURE_SET=True, only 5 features are visible to the model — and one of them is Store (a categorical with ~1115 distinct levels). NUM_LEAVES=7 caps each tree to at most 7 terminal nodes, so a single tree can only carve out ~7 store-groups at a time. This severely underfits the per-store sales structure, and the metric is currently bottlenecked by tree capacity (probe_result_7 shows the validation RMSE descending in slow ~5-RMSE step-downs every 5-10 rounds, classic underfit-but-converging behaviour). The metric is in Regime B (1641.12 is well off the random/baseline ~3611), so per the moderate-step rule I went 5x current value (7 → 31) rather than directly to the comment's named target of 63 or 127. NUM_LEAVES=31 is also LightGBM's default. This should let each tree express richer Store × DayOfWeek × Promo interactions and drive validation RMSE materially lower.
+
+Other 9 potential_improvement_* items left untouched. record() and conclude() call sites in train.py confirmed unmodified; record(epoch_idx, rmse_value) still resolves to int+float, and conclude() is still called with no arguments.

@@ -1,0 +1,21 @@
+Iteration 4 change log
+=======================
+
+Chosen item: potential_improvement_1
+
+Change: Set TRAIN_ROW_LIMIT from 2000 to None, removing the row cap so the
+model trains on the full ~307k rows of application_train.csv instead of
+the first 2000 rows.
+
+Why this is expected to lift validation ROC-AUC: 2000 rows is far below the
+sample complexity needed for a 200+ feature LightGBM model on a noisy
+binary credit-risk task; with so few training examples and a positive-class
+prior near 8%, the splits LightGBM can find are dominated by sample noise.
+Restoring full data exposes the model to the dense signal in the
+application table and is consistent with the comment's note that this is
+the single largest depressor of validation AUC. Treated as a degenerate
+guard to remove fully (per the always-fully-applied rule).
+
+Step 0 revert: Not performed. tail_mean was identical between
+probe_result_2.json and probe_result_3.json (0.5894), so the previous
+iteration was not a regression.

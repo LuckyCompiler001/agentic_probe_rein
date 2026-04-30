@@ -1,0 +1,12 @@
+Iteration 9 change log
+=======================
+
+Step 0 revert: NO. probe_result_8 tail_mean=1633.6482 was an improvement over probe_result_7 tail_mean=1641.1242 (lower_is_better, so a lower tail_mean is better). Iteration 8's raising of NUM_LEAVES from 7 to 31 helped — keep it.
+
+Chosen item: potential_improvement_2
+
+Change: Set TRAIN_DOWNSAMPLE_STRIDE from 5 to 1 in train.py (line 43), disabling the stride-based downsampling in train_model() so the full training slice is fed to LightGBM.
+
+Why this should lower validation RMSE: With MAX_TRAIN_ROWS=0 (uncapped, ~1M rows available), TRAIN_DOWNSAMPLE_STRIDE=5 was throwing away 80% of the training rows after the time-based split — the model is fitting only every 5th observation, which crucially loses store-day-of-week × promo combinations and recent-period samples. Probe_result_8 shows validation RMSE still descending steadily through epoch 149 (last 5 epochs in the 1633.24-1633.78 range, early stopping fired with patience 5 only because the slope is shallow, not because the model converged). Quintupling the available training rows should give LightGBM materially more signal per tree, drive the loss curve lower, and reduce validation RMSE. This is an "always-fully-applied" broken-cap change (direct mirror of potential_improvement_1, which was hugely beneficial when MAX_TRAIN_ROWS was uncapped) — per the rules I set the value directly to 1 in one move rather than partially uncapping.
+
+Other 9 potential_improvement_* items left untouched. record() and conclude() call sites in train.py confirmed unmodified; record(epoch_idx, rmse_value) still resolves to int+float, and conclude() is still called with no arguments.

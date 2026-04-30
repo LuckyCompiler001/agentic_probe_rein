@@ -1,0 +1,7 @@
+Chosen item: potential_improvement_5
+
+Change: Switched OBJECTIVE from "regression" to "tweedie" (single-line edit at the OBJECTIVE constant). LightGBM will use its default tweedie_variance_power; no other parameters were modified.
+
+Why expected to lower validation RMSE: M5 daily unit sales are sparse non-negative counts dominated by zeros — a classic zero-inflated regression problem. Plain L2 ("regression") loss is symmetric and treats over- and under-predicting equally, which on heavily zero-skewed targets pulls means toward small positive values inefficiently. Tweedie loss models a compound Poisson-Gamma distribution and is the standard choice for this kind of intermittent retail-demand data; it typically reduces RMSE on M5 versus L2 even before tuning the variance power. Current tail_mean is 1.8631 (Regime B refinement), and switching the loss is a categorical/discrete choice that the rules say to fully apply in one move.
+
+No revert was performed (probe_result_5.tail_mean = 1.8631 < probe_result_4.tail_mean = 1.8735, an improvement under lower_is_better).

@@ -1,0 +1,26 @@
+Iteration 9 change log
+=======================
+
+Step 0 revert: PERFORMED. probe_result_8 tail_mean (0.7707) is lower than
+probe_result_7 tail_mean (0.7772) for higher_is_better, so iteration 8's
+change (potential_improvement_9: NUM_LEAVES 8->31, MAX_DEPTH 4->-1) hurt
+validation AUC. Reverted NUM_LEAVES back to 8 and MAX_DEPTH back to 4 and
+removed the trailing "# applied" tag on potential_improvement_9, restoring
+the train.py state used to produce probe_result_7.
+
+Chosen item: potential_improvement_5
+
+Change: Set FILLNA_VALUE from 0.0 to np.nan, so the
+`merged.replace([inf,-inf], nan).fillna(FILLNA_VALUE)` step now leaves
+missing values as NaN and lets LightGBM use its native missing-value
+handling rather than collapsing NaN and 0 into the same numeric value.
+
+Why this is expected to lift validation ROC-AUC: probe_result_7 plateaued
+in the 0.7770-0.7773 band — the model is data-rich but currently sees
+"missing" and "zero" as identical for hundreds of numeric columns
+(application demographics, AMT_*, EXT_SOURCE_*, and the bureau / PREV /
+POS / INSTAL / CC aggregates that produce many natural NaNs after the
+left-join). LightGBM's native NaN handling learns a separate split
+direction for missing values, recovering signal that 0-imputation
+destroys. Treated as a categorical / discrete choice (0.0 vs np.nan)
+under the always-fully-applied rule.

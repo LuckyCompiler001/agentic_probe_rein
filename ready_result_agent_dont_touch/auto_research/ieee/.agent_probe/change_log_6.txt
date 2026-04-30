@@ -1,0 +1,10 @@
+Iteration 6 change log
+======================
+
+Step 0 — Regression revert check: N = 5. probe_result_5 tail_mean (0.8580) is HIGHER than probe_result_4 tail_mean (0.7762). Direction is higher_is_better, so the latest run is BETTER. No regression detected. No revert performed.
+
+Chosen item: potential_improvement_6
+
+Exact change: Set N_ESTIMATORS from 30 to 3000 so the booster has enough trees to actually converge (the early-stopping callback at patience=4 will still halt training once validation AUC plateaus).
+
+Rationale: probe_result_5 shows validation ROC-AUC climbing monotonically across all 30 iterations and still rising at the final epoch (0.8598), with no plateau triggering early stopping — meaning the model is being terminated by the hard cap, not by lack of further gain. 30 trees is comically low for boosting on this dataset, so per the guidance for severely-underconfigured values the named target (3000) is applied directly; early stopping at patience=4 will keep training bounded in practice. Expected to lift validation ROC-AUC further in the better (higher) direction.

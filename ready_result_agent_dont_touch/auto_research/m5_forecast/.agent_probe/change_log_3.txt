@@ -1,0 +1,7 @@
+Chosen item: potential_improvement_4
+
+Change: Flipped USE_ROLLING_MEAN_28 from False to True. This activates the 28-day rolling mean engineered feature in build_feature_block (block[:, 20]).
+
+Why expected to lower validation RMSE: The 28-day rolling mean provides a smooth, low-variance level estimate per series that captures intermittent-demand baselines and weekly/monthly seasonality averaged out. The comment names it as the single strongest RMSE-reducing engineered feature on M5; without it the boosted trees must reconstruct a level estimate from lag_1 alone, which is high-variance for sparse retail counts. Adding this feature should let the model converge to a meaningfully lower validation RMSE.
+
+No revert was performed (probe_result_2.tail_mean == probe_result_1.tail_mean = 2.1452, no regression).

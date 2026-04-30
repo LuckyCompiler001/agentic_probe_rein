@@ -1,0 +1,22 @@
+Iteration 7 change log
+=======================
+
+Chosen item: potential_improvement_3
+
+Change: Set INCLUDE_AUXILIARY from False to True, enabling the merge of
+bureau / bureau_balance / previous_application / POS_CASH_balance /
+installments_payments / credit_card_balance aggregates onto the
+application-level features.
+
+Why this is expected to lift validation ROC-AUC: probe_result_6 shows the
+curve plateauing in the 0.755-0.756 band from ~epoch 100 onward despite
+N_ESTIMATORS=250 and early-stopping patience still active — the model has
+extracted what signal it can from the application-only features. The
+auxiliary tables (credit-bureau history, prior-application repayment
+behavior, installment/credit-card balances) historically lift Home Credit
+AUC by ~0.02-0.03 over application-only baselines. Treated as a boolean
+toggle under the always-fully-applied rule.
+
+Step 0 revert: Not performed. probe_result_6 tail_mean (0.7561) is higher
+than probe_result_5 tail_mean (0.7523) for higher_is_better, so the
+previous iteration was a clear improvement, not a regression.

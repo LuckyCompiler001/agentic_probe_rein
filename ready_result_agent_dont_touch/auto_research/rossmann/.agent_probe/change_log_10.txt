@@ -1,0 +1,12 @@
+Iteration 10 change log
+=======================
+
+Step 0 revert: NO. probe_result_9 tail_mean=1613.4352 was an improvement over probe_result_8 tail_mean=1633.6482 (lower_is_better, so a lower tail_mean is better). Iteration 9's setting of TRAIN_DOWNSAMPLE_STRIDE=1 helped — keep it.
+
+Chosen item: potential_improvement_3
+
+Change: Flipped USE_LAG_AND_ROLLING_FEATURES from False to True in train.py (line 45). This makes load_and_prepare_dataset call add_lag_and_rolling_features, adding per-Store sales_lag_1, sales_lag_7, sales_lag_14, sales_roll_mean_7, and sales_roll_mean_30 features to the model.
+
+Why this should lower validation RMSE: probe_result_9 shows validation RMSE plateauing around 1613.4 for the last several epochs — the model has essentially exhausted the signal in the current feature set (Store, DayOfWeek, Promo, Open, SchoolHoliday plus calendar/store-level extras). Per-store sales lags (1, 7, 14 days) and rolling means (7, 30 day windows) directly encode the autoregressive structure of daily sales, which dominates this dataset's variance — a Rossmann store's sales today is overwhelmingly predictable from its sales last week / last month. These are widely regarded as the single most impactful feature group for the Rossmann competition. Boolean toggle => applied fully in one move per the always-fully-applied rule. Test rows have NaN Sales (and therefore NaN lags), but fill_feature_gaps replaces those with the store-level training mean and a global median fallback, so the addition won't crash inference.
+
+Other 9 potential_improvement_* items left untouched. record() and conclude() call sites in train.py confirmed unmodified; record(epoch_idx, rmse_value) still resolves to int+float, and conclude() is still called with no arguments.

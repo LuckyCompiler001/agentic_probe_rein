@@ -1,0 +1,7 @@
+Chosen item: potential_improvement_9
+
+Change: Lowered MIN_DATA_IN_LEAF from 200 to 50 (single-line edit at the MIN_DATA_IN_LEAF constant). All other parameters were left untouched.
+
+Why expected to lower validation RMSE: With NUM_LEAVES = 31 and roughly 9M training rows (300 days x 30490 series), MIN_DATA_IN_LEAF = 200 is overly conservative — it forces every leaf to absorb at least 200 samples and effectively blocks the trees from carving fine-grained store/item-level effects, which are precisely the high-cardinality structures that drive M5 retail-demand variance. The validation RMSE has plateaued at tail_mean 1.8648 with the curve still drifting downward at a tiny rate, indicating the model is capacity-limited rather than data-limited. Moving to 50 (the named upper bound of the comment's 20-50 target range) is a 4x reduction, which falls inside Regime B's 2x-5x moderate-step guidance, and unlocks finer leaf specialization without overshooting toward the lower (more aggressive) end of the named range. This should let the booster carve out per-store / per-item demand differences that are currently being averaged together, pushing tail_mean RMSE below 1.86.
+
+No revert was performed (probe_result_7.tail_mean = 1.8648 < probe_result_6.tail_mean = 1.8801, an improvement under lower_is_better).

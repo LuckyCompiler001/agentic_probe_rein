@@ -1,0 +1,10 @@
+Iteration 4 change log
+======================
+
+Step 0 — Regression revert check: N = 3. probe_result_3 tail_mean (0.7142374) is identical to probe_result_2 tail_mean (0.7142374). No regression detected (direction is higher_is_better; not worse). No revert performed.
+
+Chosen item: potential_improvement_1
+
+Exact change: Set TRAIN_ROW_LIMIT from 15000 to None so the trainer uses the full ~590k-transaction training set rather than the first 15k rows.
+
+Rationale: The 15k-row cap is a clearly-broken guard that throws away ~97.5% of the training data. With fraud at ~3.5% prevalence, the cap leaves only ~525 positive examples, starving the model of positives and capping validation ROC-AUC well below what the same configuration would achieve on the full data. Per the always-fully-applied rule for broken caps, the value is moved straight to a sane setting (None) in one move. Expected to lift ROC-AUC substantially in the better (higher) direction.

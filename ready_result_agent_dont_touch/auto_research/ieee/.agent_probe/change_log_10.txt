@@ -1,0 +1,10 @@
+Iteration 10 change log
+=======================
+
+Step 0 — Regression revert check: N = 9. probe_result_9 tail_mean (0.8773) is HIGHER than probe_result_8 tail_mean (0.8536). Direction is higher_is_better, so the most recent run is BETTER. No regression detected. No revert performed.
+
+Chosen item: potential_improvement_9
+
+Exact change: Lowered MIN_CHILD_SAMPLES from 300 to 60 (a 5x reduction — the upper end of the 2x–5x moderate-step range, still well above the comment's named target of 20).
+
+Rationale: With fraud prevalence ~3.5%, MIN_CHILD_SAMPLES=300 means a leaf needs ~300 transactions, leaving on average only ~10 fraud cases per leaf — far too few to find clean splits that isolate fraudulent behaviour, so genuine fraud signal is being absorbed into mixed leaves. Unlike NUM_LEAVES (potential_improvement_8), this constraint is NOT shadowed by MAX_DEPTH=3, so loosening it should immediately enable the booster to carve out small fraud-rich leaves and lift validation ROC-AUC. Per the Regime B guidance (metric ~0.8773, well above baseline), a moderate move (5x reduction to 60) is preferred over jumping straight to 20, which paired with high LR=0.3 could risk overfit-driven early-stop noise.

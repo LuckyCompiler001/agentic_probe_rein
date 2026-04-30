@@ -1,0 +1,16 @@
+Iteration 13 change log
+=======================
+
+Step 0 — Regression revert check: N = 12. probe_result_12 tail_mean (0.885433) is LOWER than probe_result_11 tail_mean (0.888058). Direction is higher_is_better, so the most recent run is WORSE. Iteration 12's change (VALID_TIME_QUANTILE 0.6 → 0.7) hurt the metric. Restored train.py from .agent_probe/snapshot/train_version_9.py — the snapshot whose run produced probe_result_11 (VALID_TIME_QUANTILE = 0.6, EARLY_STOPPING_ROUNDS = 50, all other improvements intact). Note: as observed in prior iterations, the literal snapshot named train_version_{N}.py = train_version_12.py does not exist; v9 is the correct revert target by parameter content (VALID_TIME_QUANTILE = 0.6) and is two indices below current (v10) consistent with the established N-2 offset.
+
+Chosen item: potential_improvement_8
+
+Exact change: Raised NUM_LEAVES from 4 to 16 — a moderate 4x step (within the 2x-5x Regime B range) that clears the MAX_DEPTH = 3 cap of 8 effective leaves.
+
+Rationale: pi_8 is the only potential_improvement item that has not yet been actioned in any direction. Among the remaining-untried-in-comment-direction options:
+  • pi_3 (VALID_TIME_QUANTILE ↑) — just tried 0.6 → 0.7 and hurt; cannot repeat in same direction.
+  • pi_7 (LEARNING_RATE ↓ to 0.03-0.05) — tried 0.3 → 0.1 in iter 8 and hurt; cannot repeat.
+  • pi_9 (MIN_CHILD_SAMPLES ↓ to 20) — tried 300 → 60 in iter 10 and hurt; cannot repeat.
+That leaves pi_8 as the only valid choice. NUM_LEAVES = 4 with MAX_DEPTH = 3 limits each tree to 4 leaves even though the depth cap allows up to 8; raising NUM_LEAVES to 16 lets the depth cap (8 leaves) become the only binding constraint, doubling the effective per-tree capacity. Per Regime B (metric ~0.888, well above baseline) the rule is moderate 2x-5x: I pick 16 (4x) over the comment's full target of 127 because anything ≥ 8 is functionally equivalent under the depth cap, and 16 is the cleanest moderate step that ensures the cap is not binding. Expected to lift ROC-AUC modestly by giving each tree richer 8-leaf structure rather than 4-leaf splits, while remaining safe against overshoot.
+
+Reverted in Step 0: yes — train.py restored from train_version_9.py before applying pi_8.

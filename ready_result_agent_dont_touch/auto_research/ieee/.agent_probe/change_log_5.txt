@@ -1,0 +1,10 @@
+Iteration 5 change log
+======================
+
+Step 0 — Regression revert check: N = 4. probe_result_4 tail_mean (0.7762) is HIGHER than probe_result_3 tail_mean (0.7142). Direction is higher_is_better, so the latest run is BETTER. No regression detected. No revert performed.
+
+Chosen item: potential_improvement_4
+
+Exact change: Set DROP_FEATURE_PREFIXES from ['V', 'C', 'D', 'M'] to [] so the trainer no longer discards every column whose name starts with V, C, D, or M.
+
+Rationale: The V/C/D/M columns are Vesta's engineered count/distance/match aggregations and are widely documented as the most predictive features in this dataset. Dropping all of them throws away the bulk of the signal, which directly caps validation ROC-AUC. Since DROP_FEATURE_PREFIXES is a discrete/categorical choice, the always-fully-applied rule says to set it to the recommended option ([]) in one move. Restoring these features is expected to substantially raise validation ROC-AUC.
