@@ -1,7 +1,0 @@
-Chosen item: potential_improvement_2
-
-Change: Raised VALID_DAYS from 7 to 28 (single-line edit at the VALID_DAYS constant), matching FORECAST_HORIZON. All other parameters were left untouched.
-
-Why expected to lower validation RMSE: With VALID_DAYS = 7 the validation fold covers only the final week of the training window, while the production target is a 28-day recursive forecast. This mismatch means early stopping is being optimized against a 7-day, low-recursion-depth signal that systematically under-weights mid- and long-horizon errors (lag/rolling features compound differently at horizon 28 vs 7), so the booster converges to a model that does well on short-horizon next-week prediction and worse on the actual 28-day target. Aligning VALID_DAYS to FORECAST_HORIZON lets early stopping select the iteration that genuinely minimizes the 28-day-recursion-aligned validation error and reduces fold variance by ~4x more rows. This is a structural alignment (match the validation length to the forecast horizon) rather than a continuous tuning knob, so the comment's named value 28 is applied in full — a partial step (e.g. VALID_DAYS = 14) would still leave the validation horizon misaligned and miss the point of the change. Current tail_mean is 1.8500 (Regime B refinement); this is the only `potential_improvement_*` not yet actioned.
-
-No revert was performed (probe_result_11.tail_mean = 1.8500 < probe_result_10.tail_mean = 1.8589, an improvement under lower_is_better).

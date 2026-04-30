@@ -1,7 +1,0 @@
-Chosen item: potential_improvement_3
-
-Change: Flipped USE_LAG_7 from False to True. This activates the lag_7 engineered feature in build_feature_block (block[:, 17] = sales_matrix[:, day - 8]).
-
-Why expected to lower validation RMSE: M5 retail sales are dominated by weekly seasonality (same weekday pattern across stores), and lag_7 is consistently among the highest-gain features in published M5 baselines. With only lag_1 active, the trees cannot directly model the weekly cycle and must rely on wday + rolling_mean_28 to approximate it. Adding lag_7 gives the model a direct same-weekday signal, which should let validation RMSE drop further from the current tail_mean of 1.8903.
-
-No revert was performed (probe_result_3.tail_mean = 1.8903 < probe_result_2.tail_mean = 2.1452, an improvement under lower_is_better).

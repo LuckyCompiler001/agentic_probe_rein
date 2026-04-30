@@ -29,7 +29,7 @@ from Questions import (
 # config
 NLP_MODEL = "opus"
 AGENT_MODEL = "opus"
-WORKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/rossmann"
+WORKING_SPACE: Final = "/home/xuanhe_linux_001/agentic_probe_rein/mimic"
 RUN_BASE = Path(__file__).parent / "response"
 
 # updated per run inside main()

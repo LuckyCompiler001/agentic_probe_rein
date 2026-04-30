@@ -1,0 +1,116 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Subgroup AUROC/AUPRC Disparity Across Ethnicity",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, and Brier score separately for each of the 6 ethnicity subgroups. Compare the gap between the best- and worst-performing groups and test statistical significance via bootstrap confidence intervals. A healthy signal: subgroup metrics overlap within bootstrap CIs and disparities are <5% absolute. Unhealthy: large gaps (>10% AUROC) between majority (e.g., White) and minority groups (e.g., Hispanic, Asian, Native American), indicating the model under-serves underrepresented populations.",
+      "possible_sources": [
+        "Chen et al., 'Why Is My Classifier Discriminatory?' NeurIPS 2018",
+        "Seyyed-Kalantari et al., 'CheXclusion: Fairness gaps in deep chest X-ray classifiers', PSB 2021",
+        "R\u00f6\u00f6sli et al., 'Bias at warp speed: how AI may contribute to disparities gap', JAMIA 2022",
+        "MIMIC-III benchmark (Harutyunyan et al., 2019)"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Equalized Odds and Demographic Parity Audit",
+      "content": "Evaluate fairness criteria including Equal Opportunity (TPR parity), Equalized Odds (TPR + FPR parity), Demographic Parity, and Predictive Parity (PPV) across ethnicity subgroups at a clinically relevant operating threshold. Compute the maximum absolute difference and disparate impact ratio (target >0.8 per the four-fifths rule). Healthy: TPR/FPR differences <0.05 across groups. Unhealthy: large TPR gaps suggest minority patients are systematically under-flagged for mortality risk.",
+      "possible_sources": [
+        "Hardt et al., 'Equality of Opportunity in Supervised Learning', NeurIPS 2016",
+        "Fairlearn toolkit (Microsoft)",
+        "AIF360 (IBM)",
+        "Pfohl et al., 'An empirical characterization of fair machine learning for clinical risk prediction', JBI 2021"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Subgroup Calibration and Reliability Curves",
+      "content": "Plot reliability diagrams and compute Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Hosmer-Lemeshow statistics overall and stratified by ethnicity. Probabilistic mortality outputs must be well-calibrated for clinical use. Healthy: ECE <0.05 across all subgroups, slope ~1, intercept ~0 in Cox calibration. Unhealthy: systematic over/under-prediction in particular subgroups (e.g., overestimating mortality for one ethnicity), which would mislead triage decisions.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks', ICML 2017",
+        "Pleiss et al., 'On Fairness and Calibration', NeurIPS 2017",
+        "Van Calster et al., 'Calibration: the Achilles heel of predictive analytics', BMC Medicine 2019"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Class Imbalance and Subgroup Representation Audit",
+      "content": "Inspect distribution of (a) mortality outcome (positive class typically ~10-13% in MIMIC), (b) ethnicity counts (typically heavily White-skewed in MIMIC-III), and (c) joint outcome\u00d7ethnicity cells. Compute representation ratios and check for cells with <30 positive examples (statistically unstable). Healthy: each subgroup has sufficient positive cases and predictions reflect base rates. Unhealthy: extreme imbalance, with rare subgroups effectively unevaluable, causing inflated overall metrics that mask poor minority performance.",
+      "possible_sources": [
+        "Johnson et al., 'MIMIC-III, a freely accessible critical care database', Scientific Data 2016",
+        "Ghassemi et al., 'A Review of Challenges and Opportunities in ML for Health', AMIA CRI 2020",
+        "Larrazabal et al., 'Gender imbalance in medical imaging datasets', PNAS 2020"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train-Validation-Test Loss/AUC Gap Analysis",
+      "content": "Track training and validation loss/AUROC across epochs. Compare final train vs. held-out test AUROC. Examine if validation curve plateaus or diverges. Healthy: small generalization gap (<3% AUROC), validation loss monotonically decreasing then plateauing. Unhealthy: large train-test gap suggesting overfitting to TF-IDF noise (10k sparse features can easily memorize), or no learning signal at all if loss flatlines near baseline.",
+      "possible_sources": [
+        "Goodfellow et al., 'Deep Learning' textbook chapter on regularization",
+        "Harutyunyan et al., 'Multitask learning and benchmarking with clinical time series data', Scientific Data 2019",
+        "Belkin et al., 'Reconciling modern machine learning practice and the bias-variance trade-off', PNAS 2019"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Input Perturbation and Feature Ablation Robustness",
+      "content": "Perturb the inputs in controlled ways: (a) zero-out the ethnicity one-hot vector to test whether the model relies on demographics rather than clinical content, (b) randomly drop top-k TF-IDF tokens, (c) inject synthetic noise into TF-IDF vectors. Measure prediction change (KL divergence, AUROC degradation). Healthy: predictions degrade gracefully and don't pivot solely on ethnicity. Unhealthy: removing ethnicity drastically changes predictions (suggesting demographic shortcut learning) or small TF-IDF perturbations cause large output swings (brittle).",
+      "possible_sources": [
+        "Geirhos et al., 'Shortcut Learning in Deep Neural Networks', Nature Machine Intelligence 2020",
+        "Ribeiro et al., 'Beyond Accuracy: Behavioral Testing of NLP Models with CheckList', ACL 2020",
+        "Adebayo et al., 'Sanity Checks for Saliency Maps', NeurIPS 2018"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Top-Token Importance and Subgroup Feature Attribution",
+      "content": "Use logistic-regression-style coefficient inspection or SHAP/LIME on TF-IDF features to identify the top-N tokens driving mortality predictions overall and per ethnic subgroup. Check whether clinically meaningful terms (e.g., 'pressors', 'intubation', 'sepsis') dominate, vs. spurious correlations (e.g., hospital ward names, ethnicity-correlated language). Healthy: clinically interpretable, stable across subgroups. Unhealthy: subgroup-specific reliance on non-clinical artifacts indicates leakage or bias.",
+      "possible_sources": [
+        "Lundberg & Lee, 'A Unified Approach to Interpreting Model Predictions', NeurIPS 2017",
+        "Caruana et al., 'Intelligible Models for HealthCare', KDD 2015",
+        "Jin et al., 'Is BERT Really Robust?', AAAI 2020"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "probe_type": "leakage",
+      "probe_name": "Temporal and Outcome Leakage Detection in Notes",
+      "content": "Verify that clinical notes used as input were authored before mortality outcome determination. Search for terms like 'expired', 'deceased', 'comfort care', 'withdrawal of care', 'morgue' that directly reveal the label. Quantify how much AUROC drops when these terms are removed from the TF-IDF vocabulary. Healthy: minimal AUROC drop after sanitization, indicating the model learns prognostic signals. Unhealthy: dramatic drop indicates the model exploits outcome leakage rather than predicting risk.",
+      "possible_sources": [
+        "Boag et al., 'What's in a Note? Unpacking Predictive Value in Clinical Note Representations', AMIA CRI 2018",
+        "Lehman et al., 'Do We Still Need Clinical Language Models?', CHIL 2023",
+        "Kaufman et al., 'Leakage in Data Mining: Formulation, Detection, Avoidance', KDD 2011"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Counterfactual Ethnicity Swap Analysis",
+      "content": "For each test patient, hold the TF-IDF features fixed and re-run inference while swapping the one-hot ethnicity vector to each of the other 5 categories. Measure prediction shift distribution (mean absolute difference, max swing). Healthy: small, clinically negligible shifts (<0.02 in probability) since clinical content should dominate. Unhealthy: large shifts indicate the model encodes ethnicity as a strong direct predictor \u2014 a fairness red flag often called 'individual unfairness' or counterfactual unfairness.",
+      "possible_sources": [
+        "Kusner et al., 'Counterfactual Fairness', NeurIPS 2017",
+        "Garg et al., 'Counterfactual Fairness in Text Classification through Robustness', AIES 2019",
+        "Prabhakaran et al., 'Perturbation Sensitivity Analysis to Detect Unintended Model Biases', EMNLP 2019"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "probe_type": "efficiency",
+      "probe_name": "Decision Curve Analysis and Clinical Net Benefit",
+      "content": "Beyond AUROC, perform Decision Curve Analysis (DCA) across a range of threshold probabilities to estimate clinical net benefit vs. 'treat-all' and 'treat-none' baselines, stratified by ethnicity. Also compute calibration-in-the-large per group. Healthy: positive net benefit across the clinically relevant threshold range (e.g., 0.05-0.30) for every subgroup. Unhealthy: net benefit drops below treat-all/none for minority groups, meaning the model would harm rather than help triage decisions for those patients.",
+      "possible_sources": [
+        "Vickers & Elkin, 'Decision Curve Analysis: A Novel Method for Evaluating Prediction Models', Med Decis Making 2006",
+        "Van Calster et al., 'Reporting and Interpreting Decision Curve Analysis', European Urology 2018",
+        "Pfohl et al., 'Net benefit, calibration, threshold selection, and training objectives for algorithmic fairness in healthcare', FAccT 2022"
+      ],
+      "confidence": 0.85
+    }
+  ]
+}

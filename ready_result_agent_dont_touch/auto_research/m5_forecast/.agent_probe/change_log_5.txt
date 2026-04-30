@@ -1,7 +1,0 @@
-Chosen item: potential_improvement_1
-
-Change: Raised TRAIN_WINDOW_DAYS from 60 to 300. This expands the training history fed to build_training_arrays from roughly two months to ten months, giving the booster many more rows that span weekly, monthly, and partial-annual seasonality.
-
-Why expected to lower validation RMSE: With only 60 days of history the model is starved of weekly/monthly/seasonal context (plus weather, holiday, and event periodicity), and the validation RMSE plateaus at ~1.87 while still slowly improving at epoch 100. A 5x larger window (300 days, just under the comment's named lower bound of 365) supplies materially more signal per series, lets the trees learn more stable level/seasonality estimates, and should reduce the variance of per-series predictions — pushing the validation RMSE below the current tail_mean of 1.8735. Step size follows Regime B (refinement): metric is clearly off baseline and improving, so a moderate 5x step is preferred over a full jump to 365-730.
-
-No revert was performed (probe_result_4.tail_mean = 1.8735 < probe_result_3.tail_mean = 1.8903, an improvement under lower_is_better).

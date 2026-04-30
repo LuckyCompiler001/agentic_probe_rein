@@ -1,7 +1,0 @@
-Chosen item: potential_improvement_7
-
-Change: Lowered LEARNING_RATE from 0.3 to 0.1 (single-line edit at the LEARNING_RATE constant). All other parameters were left untouched.
-
-Why expected to lower validation RMSE: LEARNING_RATE = 0.3 is highly aggressive for LightGBM on noisy intermittent retail sales — each boosting round makes very large parameter updates, overshooting the fine-grained per-series demand signal that matters most at this stage of training. The validation RMSE has plateaued at tail_mean = 1.8589 (probe_result_10) with the curve still drifting slowly downward over the last ~50 epochs, indicating the model has the budget (N_ESTIMATORS = 500, EARLY_STOPPING_ROUNDS = 25) but is making oversized updates that shake the loss surface around a near-minimum. Lowering LR to 0.1 (LightGBM's documented default and a 3x decrease, squarely within Regime B's 2x-5x moderate-step guidance) lets the booster take finer, more accurate gradient steps and converge closer to the true minimum. Choosing 0.1 over the comment's named 0.03-0.05 range avoids overshooting in a single iteration — at 0.05 with N_ESTIMATORS = 500 the model risks under-training without a simultaneous bump to the round budget, so a moderate step preserves headroom for future refinement.
-
-No revert was performed (probe_result_10.tail_mean = 1.8589 < probe_result_9.tail_mean = 1.8635, an improvement under lower_is_better).
