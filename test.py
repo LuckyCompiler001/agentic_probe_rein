@@ -6,7 +6,7 @@ import sys
 
 NLP_MODEL = "opus"
 AGENT_MODEL = "opus"
-WORKING_SPACE = "/home/xuanhe_linux_001/agentic_probe_rein/dummy_project"
+WORKING_SPACE = "/home/xuanhe_linux_001/agentic_probe_rein/project/dummy_project"
 
 
 def test_nlp():

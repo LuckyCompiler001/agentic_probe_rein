@@ -1,0 +1,9 @@
+{
+  "steps": [
+    {
+      "name": "setup_confirm",
+      "done": true,
+      "answer": false
+    }
+  ]
+}

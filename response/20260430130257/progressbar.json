@@ -82,6 +82,11 @@
       "name": "cycle_0/continue_confirm",
       "done": true,
       "answer": false
+    },
+    {
+      "name": "select_project",
+      "done": true,
+      "answer": "mimic"
     }
   ]
 }
