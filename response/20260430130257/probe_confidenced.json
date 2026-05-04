@@ -1,0 +1,117 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Ethnicity Subgroup Performance Disparity",
+      "content": "Evaluate AUROC, AUPRC, sensitivity, specificity, and calibration separately across the five ethnicity subgroups (white/black/hispanic/asian/other). Compute equalized-odds gap (max TPR difference and FPR difference) and demographic parity difference at the chosen operating threshold. A healthy signal is subgroup AUROCs within ~0.03 of the overall AUROC and equalized-odds gap < 0.1; an unhealthy signal is large gaps especially for under-represented groups (asian/other), which would indicate the ethnicity one-hot or correlated note features are inducing biased risk estimates. Apply by stratifying the test set, bootstrapping CIs, and inspecting the learned weights on the 5 ethnicity one-hot dimensions.",
+      "possible_sources": [
+        "Chen et al., 'Ethical Machine Learning in Healthcare' (Annual Review of Biomedical Data Science, 2021)",
+        "Pfohl et al., 'An empirical characterization of fair machine learning for clinical risk prediction' (JBI, 2021)",
+        "Hardt et al., 'Equality of Opportunity in Supervised Learning' (NeurIPS 2016)",
+        "AIF360 toolkit (Bellamy et al., 2018)"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Reliability Diagram and Calibration Error under Class Imbalance",
+      "content": "Because pos_weight rebalances the loss, the sigmoid outputs may no longer be probability-calibrated. Build a reliability diagram with 10\u201320 equal-frequency bins on the validation set and compute Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Brier score. Healthy: ECE < 0.05 and reliability curve close to the diagonal; unhealthy: systematic over-prediction of mortality risk (curve below diagonal) caused by pos_weight inflation. If miscalibrated, test post-hoc Platt scaling or temperature scaling on the validation split and compare.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks' (ICML 2017)",
+        "Niculescu-Mizil & Caruana, 'Predicting Good Probabilities With Supervised Learning' (ICML 2005)",
+        "Van Calster et al., 'Calibration: the Achilles heel of predictive analytics' (BMC Medicine 2019)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train-Val-Test Gap and Learning Curve Diagnosis",
+      "content": "Plot per-epoch train vs. validation loss and AUROC across all 50 epochs. With lr=2.0 (very high for logistic regression on 10k sparse TF-IDF features) check for: (a) loss oscillations / divergence indicating step size too large, (b) train AUROC continuing to rise while val AUROC plateaus or decays (overfitting on a 10k-dim linear model with limited samples), (c) a final train-test AUROC gap > 0.05. Healthy: smooth monotone decrease, gap < 0.03. Unhealthy: oscillation, val collapse, or large gap \u2192 suggests need for L2 regularization, early stopping, or lr decay.",
+      "possible_sources": [
+        "Goodfellow, Bengio, Courville, 'Deep Learning' Chapter 7 & 11",
+        "Prechelt, 'Early Stopping \u2014 But When?' (Neural Networks: Tricks of the Trade, 1998)",
+        "Smith, 'A disciplined approach to neural network hyper-parameters' (arXiv 2018)"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Note-Length and Vocabulary-Coverage Stress Test",
+      "content": "Stratify the test set by note length within the 48-hour window (short < 200 tokens, medium, long > 2000) and by TF-IDF vocabulary coverage (fraction of non-zero features). Measure AUROC and Brier per stratum. Healthy: stable performance across strata. Unhealthy: sharp degradation on short-note ICU stays (early deaths, transferred patients) \u2014 a clinically critical failure mode. Additionally, perturb test inputs by randomly dropping 10/25/50% of TF-IDF tokens and measure AUROC drop to estimate input-noise robustness.",
+      "possible_sources": [
+        "Boag et al., 'What's in a Note? Unpacking Predictive Value in Clinical Note Representations' (AMIA 2018)",
+        "Si et al., 'Enhancing Clinical Concept Extraction with Contextual Embeddings' (JAMIA 2019)",
+        "Hendrycks & Dietterich, 'Benchmarking Neural Network Robustness to Common Corruptions' (ICLR 2019)"
+      ],
+      "confidence": 0.78
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Label Leakage and Death-Mention Feature Audit",
+      "content": "Inspect the top-weighted TF-IDF features driving positive predictions. Mortality notes frequently contain leakage tokens (e.g., 'expired', 'deceased', 'comfort measures', 'cmo', 'withdraw', 'family meeting', 'dnr/dni', 'morgue') that may appear within the 48-hour window for early-death patients. Healthy: top features are clinical severity indicators (lactate, vasopressor, intubated). Unhealthy: outcome-leaking tokens dominate, inflating AUROC unrealistically. Apply by ranking |weight| and manually reviewing top-50 tokens, and by ablating the leakage list and re-evaluating.",
+      "possible_sources": [
+        "Ghassemi et al., 'A Review of Challenges and Opportunities in Machine Learning for Health' (AMIA Summits 2020)",
+        "Boag et al., AMIA 2018",
+        "Johnson et al., 'MIMIC-III, a freely accessible critical care database' (Scientific Data 2016)",
+        "Harutyunyan et al., 'Multitask learning and benchmarking with clinical time series data' (Scientific Data 2019)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Ethnicity Feature Influence and Counterfactual Flip Test",
+      "content": "Inspect the learned weights on the 5 ethnicity one-hot dimensions and their relative magnitude vs. text features. Run a counterfactual probe: for each test sample, flip the ethnicity one-hot to each of the other 4 categories holding TF-IDF fixed and measure (i) average predicted-probability shift and (ii) fraction of decisions that flip at the chosen threshold. Healthy: small shifts (<0.02) and <2% decision flips, suggesting ethnicity is not a dominant predictor. Unhealthy: large shifts, indicating the model uses ethnicity as a shortcut \u2014 clinically and ethically problematic.",
+      "possible_sources": [
+        "Kusner et al., 'Counterfactual Fairness' (NeurIPS 2017)",
+        "Obermeyer et al., 'Dissecting racial bias in an algorithm used to manage the health of populations' (Science 2019)",
+        "Pfohl et al., JBI 2021"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "optimization",
+      "probe_name": "Loss Landscape and Step-Size Sanity for SGD lr=2.0",
+      "content": "An lr of 2.0 with SGD on 10k-dim sparse TF-IDF inputs is unusually large and may cause weight-norm explosion or divergence. Track per-epoch (a) gradient norm, (b) weight-vector L2 norm, (c) fraction of dead/saturated logits (|logit|>10), and (d) training loss variance within each epoch. Healthy: gradient norm decreases smoothly, weight L2 stabilizes, <1% saturated logits. Unhealthy: monotonically growing weights, oscillating loss, many saturated logits \u2192 recommend lr sweep {0.01, 0.1, 0.5, 1.0, 2.0} with early stopping on val AUROC.",
+      "possible_sources": [
+        "Bottou, 'Stochastic Gradient Descent Tricks' (Neural Networks: Tricks of the Trade, 2012)",
+        "Smith, 'Cyclical Learning Rates for Training Neural Networks' (WACV 2017)",
+        "Goodfellow et al., 'Deep Learning' Chapter 8"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "probe_type": "discrimination",
+      "probe_name": "Threshold-Independent and Threshold-Dependent Discrimination Suite",
+      "content": "Mortality prediction is a heavily imbalanced binary task; AUROC alone is misleading. Report AUROC, AUPRC, sensitivity@fixed-specificity (90%, 95%), specificity@fixed-sensitivity (90%), F1 at the prevalence-tuned threshold, and decision-curve net benefit across thresholds 0.05\u20130.5. Healthy: AUROC \u2248 0.80\u20130.86 (consistent with MIMIC-III note-only baselines), AUPRC well above prevalence (~0.10\u20130.15). Unhealthy: AUROC inflated but AUPRC near baseline, or decision-curve net benefit below 'treat all' / 'treat none' across clinically relevant thresholds.",
+      "possible_sources": [
+        "Saito & Rehmsmeier, 'The Precision-Recall Plot Is More Informative than the ROC Plot' (PLoS ONE 2015)",
+        "Vickers & Elkin, 'Decision Curve Analysis' (Med Decis Making 2006)",
+        "Harutyunyan et al., Scientific Data 2019",
+        "Ghassemi et al., 'Unfolding physiological state' (KDD 2014)"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "probe_type": "stability",
+      "probe_name": "Resampling Stability and Bootstrap Confidence Intervals",
+      "content": "With a single fixed 50/25/25 split, reported metrics may be optimistic or pessimistic by chance. Re-train across N=20 random seeds (split + SGD init shuffle) and N=1000 bootstrap resamples of the test set. Report mean \u00b1 std and 95% CI for AUROC, AUPRC, ECE, and subgroup gaps. Healthy: AUROC std across seeds < 0.01 and bootstrap 95% CI width < 0.04. Unhealthy: high variance (std > 0.02) indicates the single-split result is not trustworthy and probe-metric threshold crossings could be noise.",
+      "possible_sources": [
+        "Efron & Tibshirani, 'An Introduction to the Bootstrap' (1993)",
+        "Bouthillier et al., 'Accounting for Variance in Machine Learning Benchmarks' (MLSys 2021)",
+        "Riley et al., 'Minimum sample size for developing a multivariable prediction model' (Stat Med 2020)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "robustness_distribution_shift",
+      "probe_name": "Temporal and Cross-Site Generalization",
+      "content": "Evaluate model under temporal split (train on earlier admissions, test on later) and, if available, hold-out ICU unit or hospital. Healthy: AUROC degradation < 0.03 vs. random split, calibration largely preserved. Unhealthy: substantial AUROC drop, especially concentrated in specific ethnicity subgroups, signals overfit to era-specific documentation patterns (vocabulary drift, EHR template changes). Couple with covariate shift detection: KL divergence between train and test TF-IDF distributions, and importance-weighting estimates.",
+      "possible_sources": [
+        "Nestor et al. 'Feature Robustness in Non-stationary Health Records' MLHC 2019",
+        "Finlayson et al. 'The Clinician and Dataset Shift in Artificial Intelligence' NEJM 2021",
+        "Subbaswamy & Saria 'From development to deployment: dataset shift, causality, and shift-stable models in health AI' Biostatistics 2020"
+      ],
+      "confidence": 0.88
+    }
+  ]
+}

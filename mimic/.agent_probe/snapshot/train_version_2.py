@@ -13,13 +13,14 @@ import logging
 
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 
 from dataset import MIMICMortalityDataset
 from prober import record, conclude
 from sklearn.metrics import f1_score, roc_auc_score
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
 
@@ -34,8 +35,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 BATCH_SIZE = 256
 LEARNING_RATE = 2
-NUM_EPOCHS = 100
+NUM_EPOCHS = 50
 SEED = 42
+WEIGHT_DECAY = 1e-4
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CKPT_DIR = SCRIPT_DIR / 'checkpoint'
@@ -137,21 +139,27 @@ def main(data_dir: str) -> None:
     torch.manual_seed(SEED)
     device = select_device()
     # ---- Load pre-computed features ----
-    # use_eth=False: drop the 5-dim ethnicity one-hot from input features. The
-    # probe measures the absolute AUROC gap between the largest cohort (white)
-    # and the second-largest cohort, both defined by ethnicity. Feeding the
-    # ethnicity indicator as a feature lets the linear model learn cohort-
-    # specific bias terms and biases gradient flow toward the majority cohort,
-    # which leaves the minority cohort with worse-fit TF-IDF weights -- exactly
-    # the asymmetry the probe penalizes. Removing the indicator forces the
-    # model to rely on cohort-invariant TF-IDF text features only.
     data_path = Path(data_dir)
-    train_ds = MIMICMortalityDataset(data_path, 'train', use_eth=False)
-    val_ds = MIMICMortalityDataset(data_path, 'val', use_eth=False)
+    train_ds = MIMICMortalityDataset(data_path, 'train')
+    val_ds = MIMICMortalityDataset(data_path, 'val')
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
+    # ---- Group-balanced sampler: equalize per-ethnicity contribution to gradients
+    # so the minority cohort drives the loss as much as the majority. This directly
+    # targets the cross-cohort AUROC gap measured by the probe.
+    eth_train = train_ds.eth.cpu().numpy()
+    cohort_idx = eth_train.argmax(axis=1)
+    n_cohorts = eth_train.shape[1]
+    cohort_counts = np.bincount(cohort_idx, minlength=n_cohorts)
+    inv_freq = np.where(cohort_counts > 0, 1.0 / np.maximum(cohort_counts, 1), 0.0)
+    sample_weights = inv_freq[cohort_idx].astype(np.float64)
+    sampler = WeightedRandomSampler(
+        weights=torch.as_tensor(sample_weights, dtype=torch.double),
+        num_samples=len(train_ds),
+        replacement=True,
+    )
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, sampler=sampler)
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False)
-    probe_test_ds = MIMICMortalityDataset(data_path, 'test', use_eth=False)
+    probe_test_ds = MIMICMortalityDataset(data_path, 'test')
     probe_test_loader = DataLoader(probe_test_ds, batch_size=BATCH_SIZE, shuffle=False)
 
     # ---- Class imbalance weight ----
@@ -163,11 +171,8 @@ def main(data_dir: str) -> None:
     input_dim = train_ds[0]['features'].shape[0]
     model = LogisticRegression(input_dim).to(device)
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
-    # Cosine LR decay smooths late-epoch updates so the model can fine-tune
-    # toward a lower cross-cohort AUROC gap rather than oscillating around it.
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=NUM_EPOCHS, eta_min=LEARNING_RATE * 0.01
+    optimizer = torch.optim.SGD(
+        model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
     )
 
     # ---- Checkpoint directory ----
@@ -184,15 +189,14 @@ def main(data_dir: str) -> None:
             torch.save(model.state_dict(), ckpt_path)
             logger.info('  -> Saved best model (AUROC=%.4f) to %s', best_auroc, ckpt_path)
         record(epoch, model, probe_test_loader, device)
-        scheduler.step()
 
-    conclude(0.013)
+    conclude(0.012)
 
     # ---- Test with best checkpoint ----
     logger.info('Loading best checkpoint for test evaluation ...')
     model.load_state_dict(torch.load(ckpt_path, map_location=device, weights_only=True))
 
-    test_ds = MIMICMortalityDataset(data_path, 'test', use_eth=False)
+    test_ds = MIMICMortalityDataset(data_path, 'test')
     test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False)
     logger.info('Test: %d samples', len(test_ds))
 

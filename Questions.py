@@ -20,3 +20,10 @@ QUESTION_FIVE = "Now agent finished the work, do you want to try another prober 
 
 QUESTION_SIX = "Do you want to use the auto-research feature? The agent will read your probe\n\
         and annotate train.py with 10 targeted improvement suggestions before iterating. (Y/N, default N)"
+
+QUESTION_SEVEN = "Do you want to manually override the probe threshold for this run? (Y/N, default N)\n\
+        If yes, you will be prompted for a new threshold value, and the override will be applied\n\
+        everywhere it is referenced (dev plan JSON, prober.py, and existing probe_result_*.json status)."
+
+QUESTION_SEVEN_VALUE = "Enter the new threshold (use the same wording as the dev plan, e.g. '0.15',\n\
+        '< 0.03', or 'AUROC degradation < 0.05'):"

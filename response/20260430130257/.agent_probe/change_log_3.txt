@@ -1,0 +1,42 @@
+Iteration 3 changes (train.py):
+
+REVERT: Iteration 2 (WeightedRandomSampler + weight_decay=1e-4) made the metric
+WORSE -- iteration 1 baseline tail_mean was 0.0147 (still improving at epoch
+50, final 0.0141), while iteration 2's tail_mean was 0.0158 with a noisier
+trajectory that peaked at 0.031 in early epochs. The cohort-balanced sampler
+oversampled the tiny minority cohorts and apparently destabilized the linear
+model on sparse TF-IDF features. Reverted train.py to the iteration 1 baseline
+state (no sampler, no weight_decay) before applying new changes.
+
+NEW CHANGES on top of the reverted baseline:
+
+1. NUM_EPOCHS: 50 -> 100. The baseline's per-epoch trajectory was monotonically
+   decreasing right through the end of training (epoch 40: 0.01612, epoch 45:
+   0.01493, epoch 50: 0.01414), so the model was clearly not yet converged. The
+   tail-10 mean was 0.0147; we need to drop another ~0.003 to clear the 0.012
+   threshold. More epochs let the trajectory continue along its established
+   downward slope into the regime where the last-10 mean is below threshold.
+
+2. Added torch.optim.lr_scheduler.CosineAnnealingLR with T_max=NUM_EPOCHS and
+   eta_min = LEARNING_RATE * 0.01. The base LR (2.0) is high; with shuffled
+   mini-batch SGD the late-epoch oscillation visible in iteration 1 (epoch 47
+   spiked back to 0.0169 after dropping to 0.0150 at epoch 46) suggests step
+   size is too large near convergence. Cosine decay smoothly reduces LR so the
+   final ~20 epochs take small fine-tuning steps, which should:
+     (a) lower the variance of the recorded gap in the tail-10 window, and
+     (b) let the model settle into a flatter minimum where AUROC parity across
+         cohorts is more stable.
+
+Why this should improve the metric: the baseline already showed a clean
+improving trend; the dominant problem is that 50 epochs at fixed lr=2 left the
+model still descending and oscillating slightly. Doubling the budget plus
+cosine decay extends the descent and damps the late-epoch noise, both of
+which directly lower the last-10-epoch mean -- the exact quantity the probe
+thresholds against.
+
+Integration check: record(epoch, model, probe_test_loader, device) and
+conclude(0.012) are unchanged. probe_test_loader is still built from
+MIMICMortalityDataset(data_path, 'test'), so test_ds.eth and test_ds.tfidf
+remain available to prober._init_cohorts. The threshold value 0.012 is
+unchanged. The scheduler.step() call is placed after record() so the LR
+schedule does not affect what is recorded for that epoch.

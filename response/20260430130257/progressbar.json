@@ -1,0 +1,87 @@
+{
+  "steps": [
+    {
+      "name": "setup_confirm",
+      "done": true,
+      "answer": true
+    },
+    {
+      "name": "auto_research_choice",
+      "done": true,
+      "answer": false
+    },
+    {
+      "name": "project_context",
+      "done": true,
+      "answer": "MIMIC-III ICU mortality prediction. Inputs: TF-IDF vectors over the first 48 hours of de-identified clinical notes (10k feature vocabulary) concatenated with a 5-dimensional ethnicity one-hot (white/black/hispanic/asian/other). Single-layer logistic regression (linear -> sigmoid) trained with BCEWithLogitsLoss + class-balanced pos_weight + SGD lr=2.0, batch=256, 50 epochs, fixed random 50/25/25 train/val/test split. Goal: probe model behaviour under realistic stress conditions and see whether iterative training-side improvements move the chosen probe metric across its threshold."
+    },
+    {
+      "name": "probe_generation",
+      "done": true
+    },
+    {
+      "name": "probe_confidence",
+      "done": true
+    },
+    {
+      "name": "cycle_0/probe_select",
+      "done": true,
+      "answer": 10
+    },
+    {
+      "name": "cycle_0/dev_doc_generation",
+      "done": true
+    },
+    {
+      "name": "cycle_0/dev_doc_confidence",
+      "done": true
+    },
+    {
+      "name": "cycle_0/plan_select",
+      "done": true,
+      "answer": 1
+    },
+    {
+      "name": "cycle_0/iter_count",
+      "done": true,
+      "answer": 3
+    },
+    {
+      "name": "cycle_0/implementation",
+      "done": true
+    },
+    {
+      "name": "cycle_0/exception_check_1",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_0/improve",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_0/exception_check",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_1/improve",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_1/exception_check",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_2/improve",
+      "done": true
+    },
+    {
+      "name": "cycle_0/iter_2/exception_check",
+      "done": true
+    },
+    {
+      "name": "cycle_0/continue_confirm",
+      "done": true,
+      "answer": false
+    }
+  ]
+}

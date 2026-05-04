@@ -24,6 +24,8 @@ from Questions import (
     QUESTION_FOUR,
     QUESTION_FIVE,
     QUESTION_SIX,
+    QUESTION_SEVEN,
+    QUESTION_SEVEN_VALUE,
 )
 
 # config
@@ -279,6 +281,53 @@ def _purge_new_probe_artifacts(
             continue
 
 
+def action_threshold_override(plan_idx: int | None = None) -> None:
+    """Ask whether to manually override the probe threshold; if yes, propagate.
+
+    Decides between code-only and agent-driven update based on whether prober.py
+    already exists. When plan_idx is given, also rewrites the threshold field in
+    dev_doc_confidenced.json so re-runs and resumes see the new value. Auto-
+    research mode has no dev plan, so plan_idx is omitted there.
+    """
+    if not _ask_yn(QUESTION_SEVEN, default=False):
+        return
+
+    new_threshold = get_input_placeholder(QUESTION_SEVEN_VALUE).strip()
+    if not new_threshold:
+        print("  Empty threshold — keeping the original value.")
+        return
+
+    if plan_idx is not None:
+        dev_doc_path = RESPONSE_DIR / "dev_doc_confidenced.json"
+        if dev_doc_path.exists():
+            data = json.loads(dev_doc_path.read_text())
+            old = data["dev_plans"][plan_idx].get("threshold", "<unset>")
+            data["dev_plans"][plan_idx]["threshold"] = new_threshold
+            dev_doc_path.write_text(json.dumps(data, indent=2))
+            print(f"  Updated dev_doc_confidenced.json threshold: {old!r} -> {new_threshold!r}")
+
+    prober_path = Path(WORKING_SPACE) / "prober.py"
+    if prober_path.exists():
+        print("  prober.py exists — using agent to propagate threshold to code + existing results.")
+        _agent_call(
+            "The probe threshold has been manually overridden. The new threshold is:\n"
+            f"    {new_threshold}\n\n"
+            "Tasks (do all of them, in order):\n"
+            "1. Open prober.py and update every reference to the threshold value to the new "
+            "value above. Keep the metric, direction, and PASS/FAIL semantics unchanged — only "
+            "the numerical / expression threshold changes.\n"
+            "2. If prober.py imports helpers that also hold a copy of the threshold, update "
+            "those too.\n"
+            "3. For every existing file under .agent_probe/metric/probe_result_*.json, "
+            "re-evaluate the 'status' field (PASS/FAIL) against the new threshold using the "
+            "metric values already recorded, update the 'threshold' field to the new value, "
+            "and rewrite the 'conclusion' string to reflect the re-evaluation. Do not change "
+            "the 'values' arrays.\n"
+            "4. Do not run training. Just save the file changes."
+        )
+        print(f"  Agent finished propagating threshold {new_threshold!r}.")
+
+
 def action_x_agentic_exception_catcher():
     metric_dir = Path(WORKING_SPACE) / ".agent_probe" / "metric"
     plot_dir = Path(WORKING_SPACE) / ".agent_probe" / "plot"
@@ -420,6 +469,10 @@ def _run_normal_pipeline(pb: Progressbar) -> None:
             USER_ANSWER_THREE = pb.get_answer(f"{cp}/plan_select")
             print(f"[Resume] Plan {USER_ANSWER_THREE} already selected.")
 
+        # Threshold override (always asked; default N): lets the user adjust the
+        # threshold before implementation, between iterations, or on a re-run.
+        action_threshold_override(plan_idx=USER_ANSWER_THREE - 1)
+
         prober_path = Path(WORKING_SPACE) / "prober.py"
         if not pb.is_done(f"{cp}/implementation") or not prober_path.exists():
             action_3_agent_implementation()
@@ -507,6 +560,9 @@ def _run_auto_research_pipeline(pb: Progressbar) -> None:
     if not pb.is_done("ar/probe_setup") or not prober_path.exists():
         action_auto_research_probe_setup()
         pb.mark("ar/probe_setup")
+
+    # Threshold override (auto-research mode has no dev plan to update).
+    action_threshold_override()
 
     # Run training to validate the integration and produce probe_result_1.
     if not pb.is_done("ar/exception_check_1"):
