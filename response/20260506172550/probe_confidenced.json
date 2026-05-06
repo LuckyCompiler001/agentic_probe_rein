@@ -1,0 +1,115 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Ethnicity-stratified performance disparity audit",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, FPR, FNR, and calibration error per ethnicity group (the 6 one-hot categories). Quantify disparities using metrics such as Equal Opportunity Difference, Equalized Odds gap, and Demographic Parity Difference. Healthy: gaps in TPR/FPR < 0.05 across groups and AUROC variance small relative to bootstrap CI. Unhealthy: large between-group gaps (e.g., minority groups have FNR >> majority), or one ethnicity drives most errors. Use stratified bootstrapping to confirm gaps are not noise from small subgroup sizes.",
+      "possible_sources": [
+        "Chen et al., 'Ethical Machine Learning in Healthcare' (Annual Review of Biomedical Data Science, 2021)",
+        "Hardt et al., 'Equality of Opportunity in Supervised Learning' (NeurIPS 2016)",
+        "Pfohl et al., 'An empirical characterization of fair machine learning for clinical risk prediction' (JBI 2021)",
+        "AIF360 toolkit (Bellamy et al., 2018)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Ethnicity-feature ablation and counterfactual probing",
+      "content": "Train and compare three model variants: (a) notes only (no ethnicity input), (b) ethnicity only, (c) notes + ethnicity. Then perform counterfactual flips of the ethnicity one-hot while holding TF-IDF fixed and measure prediction shift distribution. Healthy: ethnicity contributes minimally and counterfactual flips cause small, symmetric prediction changes. Unhealthy: model relies heavily on ethnicity feature, or counterfactuals systematically lower scores for specific groups, indicating direct disparate treatment.",
+      "possible_sources": [
+        "Kusner et al., 'Counterfactual Fairness' (NeurIPS 2017)",
+        "Zhang et al., 'Hurtful Words: Quantifying Biases in Clinical Contextual Word Embeddings' (CHIL 2020)",
+        "Pfohl et al., 'Counterfactual Reasoning for Fair Clinical Risk Prediction' (MLHC 2019)"
+      ],
+      "confidence": 0.85
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Group-wise calibration and reliability diagrams",
+      "content": "Plot reliability diagrams and compute Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Brier score overall and per ethnicity group. Optionally fit Platt scaling/isotonic regression per group. Healthy: ECE < 0.05 across all groups, reliability curves close to diagonal. Unhealthy: model is overconfident or underconfident for specific subgroups (e.g., predicted mortality of 0.3 corresponds to actual 0.6 in one ethnicity), which is a clinically dangerous miscalibration even if AUROC is balanced.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks' (ICML 2017)",
+        "Barda et al., 'Addressing bias in prediction models by improving subpopulation calibration' (JAMIA 2021)",
+        "Niculescu-Mizil & Caruana, 'Predicting good probabilities with supervised learning' (ICML 2005)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train/validation/test loss and AUROC trajectory inspection",
+      "content": "Track training vs. validation loss, AUROC, and AUPRC across epochs. Inspect the gap between training and validation. Healthy: smooth convergence, small generalization gap, validation AUROC plateaus near training AUROC. Unhealthy: training loss falling while validation rises (overfitting), oscillation suggesting LR too high, or both flat near random suggesting underfitting given the 10k-dim sparse TF-IDF input where a small linear or shallow MLP head may be appropriate.",
+      "possible_sources": [
+        "Goodfellow et al., 'Deep Learning' (MIT Press, ch. 7)",
+        "Caruana et al., 'Overfitting in Neural Nets: Backpropagation, Conjugate Gradient, and Early Stopping' (NeurIPS 2000)",
+        "Harutyunyan et al., 'Multitask learning and benchmarking with clinical time series data' (Sci Data 2019)"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "TF-IDF feature distribution and class-imbalance audit",
+      "content": "Inspect TF-IDF feature sparsity, vocabulary coverage per ethnicity group, mean note length, and label prevalence (mortality positive rate) overall and per group. Check for top-weighted tokens correlating with ethnicity. Healthy: similar token coverage and feature density across groups; class imbalance handled via reweighting/resampling. Unhealthy: certain ethnicity groups have systematically shorter notes or different vocabulary distributions (which could be a confounder), or severe class imbalance (typically ~10% mortality) untreated leads to majority-class collapse.",
+      "possible_sources": [
+        "Boag et al., 'What's in a Note? Unpacking Predictive Value in Clinical Note Representations' (AMIA 2018)",
+        "Johnson et al., 'MIMIC-III, a freely accessible critical care database' (Sci Data 2016)",
+        "Chawla et al., 'SMOTE: Synthetic Minority Over-sampling Technique' (JAIR 2002)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Input perturbation and noise robustness",
+      "content": "Apply controlled perturbations: random TF-IDF feature dropout (e.g., zero out 5/10/20% of nonzero features), token swap with synonyms, or Gaussian noise on features. Measure stability of predicted mortality probability and AUROC. Healthy: small perturbations cause small changes in predicted probability (<0.05 mean shift) and AUROC degrades gracefully. Unhealthy: tiny perturbations flip many predictions, suggesting overreliance on a few sparse tokens (brittle keyword shortcuts).",
+      "possible_sources": [
+        "Goodfellow et al., 'Explaining and Harnessing Adversarial Examples' (ICLR 2015)",
+        "Araujo et al., 'Stability of clinical NLP models under realistic perturbations' (CHIL 2021)",
+        "Wang & Bansal, 'Robust Machine Comprehension via Adversarial Training' (NAACL 2018)"
+      ],
+      "confidence": 0.7
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Top-feature attribution and clinical face validity",
+      "content": "Extract top-k positive and negative TF-IDF tokens via model coefficients (linear) or SHAP/Integrated Gradients (nonlinear). Compare top tokens for predicting death vs. survival. Healthy: clinically meaningful tokens (e.g., 'cardiac arrest', 'sepsis', 'comfort care', 'pressors') dominate; few demographic or proxy tokens appear. Unhealthy: top features include ethnicity-correlated proxies (insurance type, zip, language indicators) or junk artifacts (timestamps, formatting), suggesting shortcut learning.",
+      "possible_sources": [
+        "Lundberg & Lee, 'A Unified Approach to Interpreting Model Predictions' (NeurIPS 2017)",
+        "Sundararajan et al., 'Axiomatic Attribution for Deep Networks' (ICML 2017)",
+        "Caruana et al., 'Intelligible Models for HealthCare: Predicting Pneumonia Risk' (KDD 2015)"
+      ],
+      "confidence": 0.95
+    },
+    {
+      "probe_type": "subgroup_robustness",
+      "probe_name": "Worst-group and intersectional performance via DRO lens",
+      "content": "Beyond average per-group metrics, compute worst-group AUROC and AUPRC, and examine intersectional slices (ethnicity \u00d7 age bucket, ethnicity \u00d7 sex if available, ethnicity \u00d7 note length). Track the gap between average and worst-group performance. Healthy: worst-group AUROC within ~0.03 of overall AUROC. Unhealthy: large worst-group degradation indicates the loss optimization favors majority groups; consider Group DRO or reweighting.",
+      "possible_sources": [
+        "Sagawa et al., 'Distributionally Robust Neural Networks for Group Shifts' (ICLR 2020)",
+        "Koh et al., 'WILDS: A Benchmark of in-the-Wild Distribution Shifts' (ICML 2021)",
+        "Seyyed-Kalantari et al., 'Underdiagnosis bias of artificial intelligence algorithms applied to chest radiographs in under-served patient populations' (Nat Med 2021)"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "probe_type": "threshold_analysis",
+      "probe_name": "Decision-threshold sensitivity and clinical utility",
+      "content": "Compute precision-recall curves, decision curve analysis (net benefit), and identify operating thresholds that achieve clinically relevant sensitivity (e.g., 90%) per group. Compare positive predictive value, false alarm rate, and number-needed-to-alert across thresholds. Healthy: a single threshold yields acceptable sensitivity and PPV across all ethnicity groups. Unhealthy: a fixed threshold yields drastically different sensitivities per group (e.g., 0.9 for one, 0.6 for another), revealing operational unfairness even if AUROC is balanced.",
+      "possible_sources": [
+        "Vickers & Elkin, 'Decision Curve Analysis: A Novel Method for Evaluating Prediction Models' (Med Decis Making 2006)",
+        "Saito & Rehmsmeier, 'The Precision-Recall Plot Is More Informative than the ROC Plot' (PLOS ONE 2015)",
+        "Pfohl et al., 'A comparison of approaches to improve worst-case predictive model performance over patient subpopulations' (Sci Rep 2022)"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "probe_type": "efficiency",
+      "probe_name": "Model capacity vs. sparse-input efficiency check",
+      "content": "Given 10000-dim sparse TF-IDF input, compare a strong linear baseline (L2 logistic regression / linear SVM) against the deep model on the same split. Measure parameter count, training time, inference latency, and AUROC delta. Healthy: deep model meaningfully beats the linear baseline (>0.02 AUROC) and per-group disparities are not worse than the baseline. Unhealthy: deep model matches or underperforms the linear baseline while introducing higher disparity \u2014 suggesting wasted capacity, overfitting on sparse features, and unjustified complexity.",
+      "possible_sources": [
+        "Joachims, 'Text Categorization with Support Vector Machines' (ECML 1998)",
+        "Rajkomar et al., 'Scalable and accurate deep learning with electronic health records' (npj Digital Medicine 2018)",
+        "Christodoulou et al., 'A systematic review shows no performance benefit of machine learning over logistic regression for clinical prediction' (J Clin Epidemiol 2019)"
+      ],
+      "confidence": 0.92
+    }
+  ]
+}

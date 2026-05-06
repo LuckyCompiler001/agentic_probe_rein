@@ -61,6 +61,7 @@ def _ws_paths(workspace: Path) -> dict[str, Path]:
         "snapshot": base / "snapshot",
         "metric": base / "metric",
         "plot": base / "plot",
+        "live": base / "live",
         "train": workspace / "train.py",
         "prober": workspace / "prober.py",
     }
@@ -234,7 +235,11 @@ class RunState:
             _purge_glob(wp["plot"], "probe_result_*.pdf", keep_max_index=0)
             _purge_glob(wp["agent_probe"], "change_log_*.txt", keep_max_index=0)
             _purge_glob(wp["snapshot"], "train_version_*.py", keep_max_index=0)
+            _safe_unlink(wp["live"] / "probe_live.json")
             self._record.iterations = []
+            # Auto-research mode flag is per-stage-1 choice; reset it.
+            self._record.debug_flags["auto_research"] = False
+            self._record.debug_flags["threshold_override"] = None
 
         # Reverting to stage 4: keep stage-3's artifacts (v1 snapshot, prober,
         # probe_result_1, change_log_1) — clear iteration outputs only.
@@ -246,7 +251,11 @@ class RunState:
             _purge_glob(wp["plot"], "probe_result_*.pdf", keep_max_index=1)
             _purge_glob(wp["agent_probe"], "change_log_*.txt", keep_max_index=1)
             _purge_glob(wp["snapshot"], "train_version_*.py", keep_max_index=1)
-            self._record.iterations = []
+            # Drop the live file too — its trajectory is from a now-discarded iter.
+            # Fallback in /api/live-metric will read probe_result_1.json.
+            _safe_unlink(wp["live"] / "probe_live.json")
+            # Keep only the first iteration record (stage-3's first run).
+            self._record.iterations = self._record.iterations[:1]
 
         self._record.stage = target
         self._record.phase = "input" if target in (1, 2) else "ready"

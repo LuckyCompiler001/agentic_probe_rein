@@ -9,6 +9,7 @@ import { Stage2 } from "@/components/Stage2";
 import { Stage3 } from "@/components/Stage3";
 import { Stage4 } from "@/components/Stage4";
 import { Home } from "@/components/Home";
+import { GlobalLogDock } from "@/components/LogPanel";
 import { Button } from "@/components/ui";
 
 type View = "home" | "session";
@@ -181,7 +182,7 @@ export default function Page() {
         onHome={handleHome}
         homeDisabled={false}
       />
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar
           runs={runs}
           active={active}
@@ -190,27 +191,33 @@ export default function Page() {
           onRevert={handleRevert}
           workspaceOpen={!!workspace.current}
         />
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto px-8 py-8">
-            {!active ? (
-              <EmptyState onNewRun={handleNewRun} onHome={handleHome} />
-            ) : (
-              <ActiveStage run={active} onUpdate={refreshActive} />
-            )}
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-8 py-8">
+              {!active ? (
+                <EmptyState onNewRun={handleNewRun} onHome={handleHome} />
+              ) : (
+                <ActiveStage run={active} onUpdate={refreshActive} />
+              )}
 
-            {error && (
-              <div className="mt-6 px-3 py-2 rounded-md text-[12px] text-red-600 bg-red-50 border border-red-100">
-                {error}
-                <button
-                  className="ml-2 text-ink-500 hover:text-ink-900"
-                  onClick={() => setError(null)}
-                >
-                  dismiss
-                </button>
-              </div>
-            )}
-          </div>
-        </main>
+              {error && (
+                <div className="mt-6 px-3 py-2 rounded-md text-[12px] text-red-600 bg-red-50 border border-red-100">
+                  {error}
+                  <button
+                    className="ml-2 text-ink-500 hover:text-ink-900"
+                    onClick={() => setError(null)}
+                  >
+                    dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          </main>
+          <GlobalLogDock
+            runId={active?.run_id ?? null}
+            live={active?.busy ?? false}
+          />
+        </div>
       </div>
     </div>
   );

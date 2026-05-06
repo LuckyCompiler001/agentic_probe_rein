@@ -22,6 +22,14 @@ Write a self-contained `prober.py` that exposes two entry points:
 
 `def record(epoch, ...)` — called once per epoch (or per validation step) during training to capture the metric value for that step. The exact signature beyond `epoch` is yours to design based on what `train.py` can naturally pass in.
 
+  After appending the new (epoch, value) pair to its in-memory series, `record()` MUST also overwrite `WORKING_SPACE/.agent_probe/live/probe_live.json` with the current trajectory so the orchestrator's UI can draw a per-epoch live chart while training is still running. The file's JSON shape is:
+     {
+         "metric_name": "string",
+         "direction": "higher_is_better" | "lower_is_better",
+         "values": [{"epoch": int, "value": float}, ...]
+     }
+  Do NOT include a `threshold` field in this file (auto-research mode has no threshold). Create the `.agent_probe/live/` directory if it does not exist. Overwrite the file each time (do not append). Use a small atomic write (tempfile + os.replace) so a partial read never sees half-written JSON. `conclude()` does NOT need to clear or modify this file.
+
 `def conclude()` — called once after training ends, with NO arguments. It MUST do the following without raising:
 
   A. Compute statistics over all recorded values:

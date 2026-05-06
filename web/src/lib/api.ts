@@ -73,6 +73,18 @@ export type BrowseResult = {
   entries: BrowseEntry[];
 };
 
+export type LiveMetricPoint = { epoch: number; value: number };
+
+export type LiveMetric = {
+  source: "live" | "completed" | "none";
+  run_index?: number;
+  metric_name?: string | null;
+  threshold?: string | number | null;
+  direction?: "higher_is_better" | "lower_is_better" | null;
+  status?: "PASS" | "FAIL" | null;
+  values: LiveMetricPoint[];
+};
+
 async function http<T>(
   path: string,
   init: RequestInit = {},
@@ -131,6 +143,10 @@ export const api = {
       `/api/runs/${runId}/stage1/generate`,
       { method: "POST" },
     ),
+  autoResearch: (runId: string) =>
+    http<RunRecord>(`/api/runs/${runId}/stage1/auto-research`, {
+      method: "POST",
+    }),
   selectProbe: (runId: string, index: number) =>
     http<RunRecord>(`/api/runs/${runId}/stage1/select`, {
       method: "POST",
@@ -158,6 +174,11 @@ export const api = {
     ),
 
   // stage 3 / 4
+  setThreshold: (runId: string, value: string) =>
+    http<RunRecord>(`/api/runs/${runId}/stage3/threshold`, {
+      method: "POST",
+      body: JSON.stringify({ value }),
+    }),
   implement: (runId: string) =>
     http<RunRecord>(`/api/runs/${runId}/stage3/implement`, {
       method: "POST",
@@ -176,6 +197,10 @@ export const api = {
 
   // log
   getLog: (runId: string) => http<{ log: string }>(`/api/runs/${runId}/log`),
+
+  // live metric trajectory (per-epoch, dynamic during training)
+  getLiveMetric: (runId: string) =>
+    http<LiveMetric>(`/api/runs/${runId}/live-metric`),
 
   // cancel any in-flight stage action; resets the owning run's phase
   cancel: () =>

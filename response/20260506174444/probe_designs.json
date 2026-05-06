@@ -1,0 +1,115 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Subgroup AUROC and Equalized Odds Across Ethnicity",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, FPR and FNR separately for each of the 6 ethnicity groups. Quantify disparities using Equalized Odds gap (max |TPR_i - TPR_j|, max |FPR_i - FPR_j|) and Equal Opportunity gap. Healthy: gaps below ~0.05 and overlapping confidence intervals across groups. Unhealthy: substantial AUROC drop or FNR inflation in minority strata, indicating the TF-IDF + ethnicity model encodes systematic disparity (a known issue with MIMIC-III clinical notes).",
+      "possible_sources": [
+        "Chen et al. 'Why Is My Classifier Discriminatory?' NeurIPS 2018",
+        "Hardt et al. 'Equality of Opportunity in Supervised Learning' NeurIPS 2016",
+        "R\u00f6\u00f6sli et al. 'Bias at warp speed: how AI may contribute to disparities gap in COVID-19' JAMIA 2021",
+        "Seyyed-Kalantari et al. 'CheXclusion' Pacific Symposium 2021"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Group-Conditional Calibration and Brier Decomposition",
+      "content": "Mortality probabilities must be calibrated for clinical use. Compute reliability diagrams, Expected Calibration Error (ECE), Maximum Calibration Error, and Brier score globally and per ethnicity group. Decompose Brier into reliability/resolution/uncertainty. Healthy: ECE < 0.05 across all groups, points lie near the diagonal. Unhealthy: systematic over- or under-confidence, especially when calibration is good for the majority group but poor for minorities, which signals fairness violation in the calibration sense.",
+      "possible_sources": [
+        "Guo et al. 'On Calibration of Modern Neural Networks' ICML 2017",
+        "Pleiss et al. 'On Fairness and Calibration' NeurIPS 2017",
+        "Naeini et al. 'Obtaining Well Calibrated Probabilities' AAAI 2015"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Class Imbalance and Per-Group Prevalence Audit",
+      "content": "ICU mortality is heavily imbalanced (~10\u201313% positive in MIMIC). Verify global positive rate, per-ethnicity prevalence, and per-ethnicity sample size. Check whether minority groups (e.g., Native American, 'OTHER') have <100 samples, which inflates variance of fairness metrics. Healthy: training/val/test stratified by both label and ethnicity; minority cohorts large enough for reliable estimation. Unhealthy: severe stratum imbalance such that one group dominates the loss and others are statistically invisible.",
+      "possible_sources": [
+        "Johnson et al. 'MIMIC-III, a freely accessible critical care database' Scientific Data 2016",
+        "Harutyunyan et al. 'Multitask learning and benchmarking with clinical time series' Scientific Data 2019",
+        "He & Garcia 'Learning from Imbalanced Data' IEEE TKDE 2009"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train/Validation/Test Loss Curves and Overfitting Diagnosis",
+      "content": "Plot train vs. validation loss/AUROC across epochs. With a 10k-dim TF-IDF input on a typical MIMIC mortality cohort (~20k patients), overfitting is a primary risk. Healthy: validation AUROC plateaus close to training; small generalization gap (<0.03 AUROC). Unhealthy: monotonically increasing train AUROC while validation declines, or large gap (>0.1) \u2014 indicates need for L1/L2 regularization, dropout, or early stopping.",
+      "possible_sources": [
+        "Goodfellow, Bengio, Courville 'Deep Learning' Chapter 7",
+        "Prechelt 'Early Stopping \u2014 but when?' Neural Networks 1998",
+        "Caruana et al. 'Overfitting in Neural Nets' NIPS 2000"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Ethnicity-Feature Ablation and Counterfactual Flip Test",
+      "content": "Because ethnicity is fed as an explicit 6-dim one-hot, probe its causal influence: (a) zero-out the ethnicity vector at inference and re-evaluate AUROC and per-patient prediction shift; (b) counterfactually swap the one-hot to each of the other 5 groups and measure |\u0394p(mortality)|. Healthy: small counterfactual shifts unless ethnicity carries genuine clinical signal correlated with care patterns. Unhealthy: large prediction flips (>0.1) caused solely by ethnicity, indicating the model uses demographic identity as a shortcut rather than clinical content.",
+      "possible_sources": [
+        "Kusner et al. 'Counterfactual Fairness' NeurIPS 2017",
+        "Garg et al. 'Counterfactual Fairness in Text Classification through Robustness' AIES 2019",
+        "Pfohl et al. 'An empirical characterization of fair ML for clinical risk prediction' JBI 2021"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Top-TF-IDF Token Attribution and Clinical Plausibility",
+      "content": "Extract the highest-weighted TF-IDF tokens contributing to positive (mortality) and negative predictions, globally and per ethnicity group via permutation importance or logistic-regression coefficients / integrated gradients. Healthy: top features are clinically plausible (e.g., 'pressors', 'comfort care', 'withdraw', 'GCS 3', 'asystole'). Unhealthy: top features are administrative artifacts, hospital-unit codes, name fragments, or stop-word residue \u2014 suggesting leakage or weak preprocessing.",
+      "possible_sources": [
+        "Ribeiro et al. 'Why Should I Trust You? Explaining the Predictions of Any Classifier' KDD 2016",
+        "Lundberg & Lee 'A Unified Approach to Interpreting Model Predictions (SHAP)' NeurIPS 2017",
+        "Sushil et al. 'Patient representation learning and interpretable evaluation using clinical notes' JBI 2018"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data-leakage",
+      "probe_name": "Discharge-Summary and Outcome-Token Leakage Audit",
+      "content": "Clinical notes can contain post-hoc outcome language ('expired', 'pronounced dead', 'comfort measures only', 'DNR/DNI', 'autopsy', discharge-summary timestamps). Probe whether such tokens appear in the TF-IDF vocabulary and dominate predictions. Filter notes to those written before a fixed cutoff (e.g., first 24/48h of ICU stay) and re-train; healthy AUROC should drop modestly. Unhealthy: AUROC collapses from ~0.90 to ~0.70, confirming the original model relied on leakage rather than early predictive signal.",
+      "possible_sources": [
+        "Boag et al. 'What's in a Note? Unpacking Predictive Value in Clinical Note Representations' AMIA 2018",
+        "Lehman et al. 'Inferring Multimodal Latent Topics from Electronic Medical Records' AMIA 2018",
+        "Ghassemi et al. 'A review of challenges and opportunities in machine learning for health' AMIA CRI 2020"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Subgroup Robustness Under Distributional Shift",
+      "content": "Evaluate worst-group performance using DRO-style metrics: report worst-group AUROC, accuracy, and loss across ethnicity strata. Additionally test temporal shift (train on earlier admissions, test on later) and care-unit shift (MICU vs SICU vs CCU if available). Healthy: worst-group AUROC within ~0.03 of average; small degradation under shift. Unhealthy: worst-group AUROC much lower than average \u2014 the empirical risk minimizer is masking poor minority-group behavior.",
+      "possible_sources": [
+        "Sagawa et al. 'Distributionally Robust Neural Networks' ICLR 2020",
+        "Koh et al. 'WILDS: A Benchmark of in-the-Wild Distribution Shifts' ICML 2021",
+        "Subbaswamy & Saria 'From development to deployment: dataset shift, source selection, and model robustness' Biostatistics 2020"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "decision-utility",
+      "probe_name": "Threshold Sensitivity and Net Clinical Benefit",
+      "content": "A scalar mortality probability is only useful if a threshold yields good clinical decisions. Sweep thresholds and report PR curves, sensitivity at fixed specificity (e.g., Sens@Spec=0.95), and decision-curve analysis (net benefit vs. treat-all and treat-none). Per-ethnicity decision curves reveal whether a single global threshold yields equitable clinical utility. Healthy: net benefit positive across realistic threshold ranges and consistent across groups. Unhealthy: optimal threshold differs sharply across groups, requiring group-specific operating points.",
+      "possible_sources": [
+        "Vickers & Elkin 'Decision curve analysis: a novel method for evaluating prediction models' Med Decis Making 2006",
+        "Saito & Rehmsmeier 'The Precision-Recall Plot Is More Informative than the ROC Plot' PLOS ONE 2015",
+        "Pfohl et al. 'Net benefit, calibration, threshold selection, and training objectives for algorithmic fairness in healthcare' FAccT 2022"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "representation",
+      "probe_name": "Demographic Probing of Learned Representations",
+      "content": "Train a linear probe on the model's penultimate-layer activations to predict ethnicity from notes alone (i.e., excluding the explicit ethnicity input). High probe accuracy indicates that demographic information is implicitly encoded in TF-IDF-driven representations and may be exploited by the classifier even if the one-hot is removed. Healthy: probe accuracy near base rate / language-balanced after notes-only training. Unhealthy: probe AUROC \u226b chance, meaning ethnicity is recoverable from notes \u2014 confounding attempts to mitigate bias by simply dropping the demographic input.",
+      "possible_sources": [
+        "Elazar & Goldberg 'Adversarial Removal of Demographic Attributes from Text Data' EMNLP 2018",
+        "Zhang et al. 'Hurtful Words: Quantifying Biases in Clinical Contextual Word Embeddings' CHIL 2020",
+        "Ravfogel et al. 'Null It Out: Guarding Protected Attributes by Iterative Nullspace Projection' ACL 2020"
+      ],
+      "confidence": 0.0
+    }
+  ]
+}

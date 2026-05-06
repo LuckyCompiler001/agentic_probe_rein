@@ -94,6 +94,10 @@ class ListDirBody(BaseModel):
     path: str
 
 
+class ThresholdBody(BaseModel):
+    value: str
+
+
 # ── Workspace ────────────────────────────────────────────────────────────────
 @app.get("/api/workspace")
 def get_workspace():
@@ -212,6 +216,19 @@ def stage1_artifact(run_id: str):
     return _stage1_artifact(state)
 
 
+@app.post("/api/runs/{run_id}/stage1/auto-research")
+async def stage1_auto_research(run_id: str):
+    """Skip NLP probe + dev-plan, jump straight to a performance-monitoring probe.
+
+    The agent picks a metric, writes prober.py, integrates train.py, then we run
+    training + commentor + training. After this the run is parked at stage 4.
+    """
+    state = load_run(run_id)
+    await _run_blocking(stages_mod.auto_research_setup, state)
+    state = load_run(run_id)
+    return _state_payload(state)
+
+
 # ── Stage 2 ──────────────────────────────────────────────────────────────────
 @app.post("/api/runs/{run_id}/stage2/generate")
 async def stage2_generate(run_id: str):
@@ -246,6 +263,17 @@ async def stage3_implement(run_id: str):
     return _state_payload(state)
 
 
+@app.post("/api/runs/{run_id}/stage3/threshold")
+def stage3_threshold(run_id: str, body: ThresholdBody):
+    """Override the selected dev plan's threshold before running implement."""
+    state = load_run(run_id)
+    try:
+        stages_mod.override_threshold(state, body.value.strip())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return _state_payload(state)
+
+
 # ── Stage 4 ──────────────────────────────────────────────────────────────────
 @app.post("/api/runs/{run_id}/stage4/iterate")
 async def stage4_iterate(run_id: str):
@@ -273,8 +301,10 @@ async def stream_log(run_id: str):
     log_path = state.log_path
 
     async def gen():
-        # Send what's already there, then tail new appends.
+        # Tail new appends. Buffer partial trailing lines so we don't emit a
+        # half-written log line as if it were a complete one.
         last_size = 0
+        buf = b""
         while True:
             try:
                 if log_path.exists():
@@ -284,10 +314,12 @@ async def stream_log(run_id: str):
                             f.seek(last_size)
                             chunk = f.read(size - last_size)
                         last_size = size
-                        # SSE: each line is a separate "data:" event.
-                        for line in chunk.decode("utf-8", errors="replace").splitlines():
-                            yield f"data: {line}\n\n"
-                # heartbeat every loop so the client knows we're alive.
+                        buf += chunk
+                        if b"\n" in buf:
+                            parts = buf.split(b"\n")
+                            buf = parts.pop()  # keep trailing partial line
+                            for line in parts:
+                                yield f"data: {line.decode('utf-8', errors='replace')}\n\n"
                 yield ": ping\n\n"
                 await asyncio.sleep(0.5)
             except asyncio.CancelledError:
@@ -302,6 +334,49 @@ def read_log(run_id: str):
     if not state.log_path.exists():
         return {"log": ""}
     return {"log": state.log_path.read_text(errors="replace")}
+
+
+# ── Live metric (per-epoch, dynamic during training) ─────────────────────────
+@app.get("/api/runs/{run_id}/live-metric")
+def live_metric(run_id: str):
+    """Return the current run's per-epoch metric trajectory for live charting.
+
+    Reads `<workspace>/.agent_probe/live/probe_live.json` if the agent emitted
+    it (from the prompt). Falls back to the last-completed
+    `.agent_probe/metric/probe_result_N.json` so we can still display data after
+    a run finishes.
+    """
+    state = load_run(run_id)
+    live = state.workspace / ".agent_probe" / "live" / "probe_live.json"
+    if live.exists():
+        try:
+            return {"source": "live", **json.loads(live.read_text())}
+        except Exception:
+            pass
+
+    # Fallback: latest completed result.
+    metric_dir = state.workspace / ".agent_probe" / "metric"
+    if not metric_dir.exists():
+        return {"source": "none", "values": []}
+    nums: list[int] = []
+    for p in metric_dir.glob("probe_result_*.json"):
+        try:
+            nums.append(int(p.stem.rsplit("_", 1)[-1]))
+        except ValueError:
+            continue
+    if not nums:
+        return {"source": "none", "values": []}
+    n = max(nums)
+    data = json.loads((metric_dir / f"probe_result_{n}.json").read_text())
+    return {
+        "source": "completed",
+        "run_index": n,
+        "metric_name": data.get("metric_name"),
+        "threshold": data.get("threshold"),
+        "direction": data.get("direction"),
+        "status": data.get("status"),
+        "values": data.get("values", []),
+    }
 
 
 # ── Payload builders ─────────────────────────────────────────────────────────

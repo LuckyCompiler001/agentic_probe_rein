@@ -14,6 +14,15 @@ Write a self-contained `prober.py` that exposes two entry points:
 
 `def record(epoch, ...)` — called once per epoch during training to collect the metric value for that step.
 
+  After appending the new (epoch, value) pair to its in-memory series, `record()` MUST also overwrite `WORKING_SPACE/.agent_probe/live/probe_live.json` with the current trajectory so the orchestrator's UI can draw a per-epoch live chart while training is still running. The file's JSON shape is:
+     {
+         "metric_name": "string",
+         "threshold": float,
+         "direction": "higher_is_better" | "lower_is_better",
+         "values": [{"epoch": int, "value": float}, ...]
+     }
+  Create the `.agent_probe/live/` directory if it does not exist. Overwrite the file each time (do not append). Use a small atomic write (tempfile + os.replace) so a partial read never sees half-written JSON. `conclude()` does NOT need to clear or modify this file — leaving the final trajectory in place is correct.
+
 `def conclude(threshold)` — called once after training completes. It must do the following with no exceptions:
 
   A. Compute statistics over all recorded values:

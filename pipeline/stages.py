@@ -19,8 +19,13 @@ from hard_prompt.nlp_prober_confi_comput import PROMPT_TWO
 from hard_prompt.nlp_dev_doc_gen import PROMPT_THREE
 from hard_prompt.nlp_dd_confi_comput import PROMPT_FOUR
 from hard_prompt.agent_dd_implement import PROMPT_FIVE
+from hard_prompt.agent_improve_commentor import PROMPT_SIX
 from hard_prompt.agent_iterat_improver import PROMPT_SEVEN
 from hard_prompt.agent_exception_catcher import PROMPT_EIGHT
+from hard_prompt.auto_research_prompt_patch import (
+    PROMPT_AUTO_RESEARCH_PATCH_PERFORMANCE_PROBE_IMPLEMENTATION_AND_INTEGRATION,
+    PROMPT_AUTO_RESEARCH_PATCH_ITERATION_IMPROVEMENT,
+)
 
 from .llm import nlp_call, agent_call
 from .state import (
@@ -45,10 +50,18 @@ def generate_probes(state: RunState) -> dict:
 
     state.set_phase(Stage.ONE, "running")
 
-    designs = nlp_call(f"{PROMPT_ONE}\n\n{state.record.context}")
+    designs = nlp_call(
+        f"{PROMPT_ONE}\n\n{state.record.context}",
+        log_path=state.log_path,
+        label="stage 1.a probe-design generation",
+    )
     state.run_dir.joinpath(PROBE_DESIGNS).write_text(json.dumps(designs, indent=2))
 
-    confidenced = nlp_call(f"{PROMPT_TWO}\n\n{json.dumps(designs)}")
+    confidenced = nlp_call(
+        f"{PROMPT_TWO}\n\n{json.dumps(designs)}",
+        log_path=state.log_path,
+        label="stage 1.b probe-design confidence",
+    )
     state.run_dir.joinpath(PROBE_CONFIDENCED).write_text(json.dumps(confidenced, indent=2))
 
     state.set_phase(Stage.ONE, "generated")
@@ -65,6 +78,57 @@ def select_probe(state: RunState, index_1based: int) -> None:
     state.advance_to(Stage.TWO)
 
 
+def auto_research_setup(state: RunState) -> None:
+    """Stage 1 alternative: skip NLP probe/dev-plan generation entirely.
+
+    The agent picks a standard performance metric, writes prober.py + integrates
+    train.py, then we run training, run the commentor (which seeds 10
+    `# potential_improvement_N:` markers in train.py), then training again to
+    validate. This jumps straight from stage 1 to stage 4.
+    """
+    state.set_phase(Stage.ONE, "running")
+    state.record.debug_flags["auto_research"] = True
+    state.save()
+
+    agent_call(
+        PROMPT_AUTO_RESEARCH_PATCH_PERFORMANCE_PROBE_IMPLEMENTATION_AND_INTEGRATION,
+        cwd=state.workspace,
+        log_path=state.log_path,
+    )
+
+    snapshot_dir = state.workspace / ".agent_probe" / "snapshot"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    (snapshot_dir / "train_version_1.py").write_text(
+        (state.workspace / "train.py").read_text()
+    )
+
+    # Validate the integration with a real training run.
+    run_training_with_autofix(state)
+
+    # Commentor seeds train.py with the 10 improvement markers used by
+    # PROMPT_AUTO_RESEARCH_PATCH_ITERATION_IMPROVEMENT in stage 4.
+    agent_call(
+        f"{PROMPT_SIX}\n\nTarget file: train.py",
+        cwd=state.workspace,
+        log_path=state.log_path,
+    )
+    # Re-validate after the commentor edits.
+    run_training_with_autofix(state)
+
+    snapshot = _read_latest_metric(state.workspace)
+    if snapshot is not None:
+        state.record_iteration(IterationRecord(
+            index=snapshot["index"],
+            metric_name=snapshot.get("metric_name"),
+            metric_value=snapshot.get("metric_value"),
+            threshold=str(snapshot.get("threshold")) if snapshot.get("threshold") is not None else None,
+            status=snapshot.get("status"),
+            note="auto-research first run",
+        ))
+
+    state.advance_to(Stage.FOUR)
+
+
 # ── Stage 2: dev plan ────────────────────────────────────────────────────────
 def generate_dev_plans(state: RunState) -> dict:
     if state.record.probe_index is None:
@@ -75,10 +139,18 @@ def generate_dev_plans(state: RunState) -> dict:
     confidenced = json.loads(state.artifact_path(PROBE_CONFIDENCED).read_text())
     selected = confidenced["probe_designs"][state.record.probe_index - 1]
 
-    plans = nlp_call(f"{PROMPT_THREE}\n\n{json.dumps(selected, indent=2)}")
+    plans = nlp_call(
+        f"{PROMPT_THREE}\n\n{json.dumps(selected, indent=2)}",
+        log_path=state.log_path,
+        label="stage 2.a dev-plan generation",
+    )
     state.run_dir.joinpath(DEV_DOC).write_text(json.dumps(plans, indent=2))
 
-    confidenced_plans = nlp_call(f"{PROMPT_FOUR}\n\n{json.dumps(plans)}")
+    confidenced_plans = nlp_call(
+        f"{PROMPT_FOUR}\n\n{json.dumps(plans)}",
+        log_path=state.log_path,
+        label="stage 2.b dev-plan confidence",
+    )
     state.run_dir.joinpath(DEV_DOC_CONFIDENCED).write_text(json.dumps(confidenced_plans, indent=2))
 
     state.set_phase(Stage.TWO, "generated")
@@ -92,6 +164,26 @@ def select_plan(state: RunState, index_1based: int) -> None:
         raise ValueError(f"index out of range: {index_1based} (have {n})")
     state.select_plan(index_1based)
     state.advance_to(Stage.THREE)
+
+
+def override_threshold(state: RunState, new_threshold: str) -> None:
+    """Replace the selected dev plan's threshold before stage-3 implementation.
+
+    Only valid pre-implement (no prober.py yet). Post-implement threshold changes
+    would require also rewriting prober.py + re-evaluating existing metrics —
+    deliberately not supported here to keep the surface small.
+    """
+    if state.record.plan_index is None:
+        raise ValueError("Cannot override threshold: no plan selected.")
+    if (state.workspace / "prober.py").exists():
+        raise ValueError("Cannot override threshold once prober.py exists. Revert to stage 3 first.")
+    path = state.artifact_path(DEV_DOC_CONFIDENCED)
+    data = json.loads(path.read_text())
+    idx = state.record.plan_index - 1
+    data["dev_plans"][idx]["threshold"] = new_threshold
+    path.write_text(json.dumps(data, indent=2))
+    state.record.debug_flags["threshold_override"] = new_threshold
+    state.save()
 
 
 # ── Stage 3: implementation ──────────────────────────────────────────────────
@@ -157,7 +249,14 @@ def iterate_once(state: RunState) -> dict:
         (state.workspace / "train.py").read_text()
     )
 
-    agent_call(PROMPT_SEVEN, cwd=state.workspace, log_path=state.log_path)
+    # Auto-research mode uses a different iteration prompt (regression-aware,
+    # comment-driven). Normal mode uses the dev-plan-driven iteration prompt.
+    iter_prompt = (
+        PROMPT_AUTO_RESEARCH_PATCH_ITERATION_IMPROVEMENT
+        if state.record.debug_flags.get("auto_research")
+        else PROMPT_SEVEN
+    )
+    agent_call(iter_prompt, cwd=state.workspace, log_path=state.log_path)
     run_training_with_autofix(state)
 
     snapshot = _read_latest_metric(state.workspace)
@@ -247,6 +346,11 @@ def _purge_new_artifacts(metric_dir: Path, plot_dir: Path, existing: set[int]) -
                 p.unlink(missing_ok=True)
         except ValueError:
             continue
+    # Also clean the live file so a partially-written trajectory from the failed
+    # run doesn't bleed into the retry attempt's chart.
+    live = metric_dir.parent / "live" / "probe_live.json"
+    if live.exists():
+        live.unlink(missing_ok=True)
 
 
 def _read_latest_metric(workspace: Path) -> dict | None:

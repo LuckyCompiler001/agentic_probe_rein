@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api, RunRecord } from "@/lib/api";
 import { Button, Pill, SectionLabel, Spinner } from "./ui";
 import { Header } from "./Stage1";
-import { LogSection } from "./LogPanel";
+import { MetricChart } from "./MetricChart";
 
 export function Stage4({
   run,
@@ -17,6 +17,7 @@ export function Stage4({
   const [error, setError] = useState<string | null>(null);
 
   const passed = run.iterations.some((i) => i.status === "PASS");
+  const isAutoResearch = run.debug_flags.auto_research;
 
   async function handleIterate() {
     setRunning(true);
@@ -36,29 +37,43 @@ export function Stage4({
       <Header
         n={4}
         title="Iteration"
-        subtitle="Each round, the agent edits train.py to push the probe metric. Stops automatically when status becomes PASS."
+        subtitle={
+          isAutoResearch
+            ? "Each round, the agent applies one of the 10 # potential_improvement comments seeded in train.py and re-runs training. Auto-research has no PASS gate — keep iterating as long as the metric is still moving."
+            : "Each round, the agent edits train.py to push the probe metric. Stops automatically when status becomes PASS."
+        }
       />
 
       <section className="flex items-center gap-3">
-        <Button onClick={handleIterate} disabled={running || run.busy || passed}>
+        <Button
+          onClick={handleIterate}
+          disabled={running || run.busy || (passed && !isAutoResearch)}
+        >
           {running ? (
             <>
               <Spinner /> Iterating…
             </>
-          ) : passed ? (
+          ) : passed && !isAutoResearch ? (
             "PASSED — done"
           ) : (
             "Run next iteration"
           )}
         </Button>
         <span className="text-[12px] text-ink-500">
-          {run.iterations.length} run{run.iterations.length === 1 ? "" : "s"} so far
+          {run.iterations.length} run{run.iterations.length === 1 ? "" : "s"}{" "}
+          so far
         </span>
         {passed && <Pill tone="pass">PASS</Pill>}
+        {isAutoResearch && <Pill tone="neutral">auto-research</Pill>}
       </section>
 
       <section className="space-y-2">
-        <SectionLabel>Metric trajectory</SectionLabel>
+        <SectionLabel>Live metric (current run)</SectionLabel>
+        <MetricChart runId={run.run_id} live={running || run.busy} />
+      </section>
+
+      <section className="space-y-2">
+        <SectionLabel>Iteration history</SectionLabel>
         {run.iterations.length === 0 ? (
           <div className="rounded-md border border-dashed border-ink-200 px-3 py-6 text-center text-[12px] text-ink-400">
             no iterations yet
@@ -73,8 +88,6 @@ export function Stage4({
           {error}
         </div>
       )}
-
-      <LogSection runId={run.run_id} live={running || run.busy} />
     </div>
   );
 }

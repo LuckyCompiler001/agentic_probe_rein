@@ -13,12 +13,16 @@ export function Stage1({
 }) {
   const [context, setContext] = useState(run.context ?? "");
   const [designs, setDesigns] = useState<ProbeDesign[] | null>(null);
+  const [autoResearch, setAutoResearch] = useState(
+    run.debug_flags.auto_research,
+  );
   const [generating, setGenerating] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setContext(run.context ?? "");
+    setAutoResearch(run.debug_flags.auto_research);
     if (run.stage >= 1 && (run.phase === "generated" || run.stage > 1)) {
       api
         .getStage1(run.run_id)
@@ -27,7 +31,7 @@ export function Stage1({
     } else {
       setDesigns(null);
     }
-  }, [run.run_id, run.stage, run.phase, run.context]);
+  }, [run.run_id, run.stage, run.phase, run.context, run.debug_flags.auto_research]);
 
   async function handleGenerate() {
     setError(null);
@@ -35,6 +39,19 @@ export function Stage1({
     try {
       await api.setContext(run.run_id, context);
       await api.generateProbes(run.run_id);
+      onUpdate();
+    } catch (e) {
+      setError(String((e as Error).message ?? e));
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleAutoResearch() {
+    setError(null);
+    setGenerating(true);
+    try {
+      await api.autoResearch(run.run_id);
       onUpdate();
     } catch (e) {
       setError(String((e as Error).message ?? e));
@@ -57,58 +74,98 @@ export function Stage1({
   }
 
   const selected = run.probe_index;
+  const stage1Active = run.stage === 1;
 
   return (
     <div className="space-y-6">
       <Header
         n={1}
         title="Probe Design"
-        subtitle="Describe your project; the model will propose probe designs and rate its own confidence."
+        subtitle="Describe your project and the model proposes probe designs with self-rated confidence."
       />
 
-      {/* Context input */}
-      <section>
-        <SectionLabel>Project context</SectionLabel>
-        <textarea
-          value={context}
-          onChange={(e) => setContext(e.target.value)}
-          rows={4}
-          className="mt-2 w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-[13px] focus:border-ink-400"
-          placeholder="One or two sentences about the project + dataset description."
-          disabled={run.stage > 1}
+      {/* Mode toggle (only at stage 1, before any work) */}
+      {stage1Active && !designs && (
+        <ModeToggle
+          autoResearch={autoResearch}
+          onChange={setAutoResearch}
+          disabled={generating}
         />
-        <div className="mt-2 flex items-center gap-2">
-          {run.stage === 1 && (
-            <Button
-              onClick={handleGenerate}
-              disabled={generating || !context.trim()}
-            >
+      )}
+
+      {/* Auto-research path */}
+      {stage1Active && autoResearch && !designs && (
+        <Card className="p-4">
+          <div className="text-[12.5px] text-ink-700 leading-relaxed">
+            The agent will read <span className="font-mono">train.py</span>,
+            pick a standard performance metric appropriate for your task, write{" "}
+            <span className="font-mono">prober.py</span>, integrate it into{" "}
+            <span className="font-mono">train.py</span>, and run training to
+            produce the first metric. There is no probe selection or dev plan
+            in this mode — you'll jump straight to stage 4 (iteration).
+          </div>
+          <div className="mt-4">
+            <Button onClick={handleAutoResearch} disabled={generating}>
               {generating ? (
                 <>
-                  <Spinner /> Generating…
+                  <Spinner /> Running setup…
                 </>
-              ) : designs ? (
-                "Regenerate"
               ) : (
-                "Generate Probes"
+                "Run Auto-Research Setup"
               )}
             </Button>
-          )}
-          {run.stage > 1 && (
-            <Pill tone="pass">
-              probe #{run.probe_index} selected · stage {run.stage}
-            </Pill>
-          )}
-        </div>
-      </section>
+          </div>
+        </Card>
+      )}
 
-      {/* Designs list */}
-      {designs && (
+      {/* Regular path: context + generate */}
+      {(!autoResearch || !stage1Active) && (
+        <section>
+          <SectionLabel>Project context</SectionLabel>
+          <textarea
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            rows={4}
+            className="mt-2 w-full rounded-md border border-ink-200 bg-white px-3 py-2 text-[13px] focus:border-ink-400"
+            placeholder="One or two sentences about the project + dataset description."
+            disabled={!stage1Active || autoResearch}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            {stage1Active && !autoResearch && (
+              <Button
+                onClick={handleGenerate}
+                disabled={generating || !context.trim()}
+              >
+                {generating ? (
+                  <>
+                    <Spinner /> Generating…
+                  </>
+                ) : designs ? (
+                  "Regenerate"
+                ) : (
+                  "Generate Probes"
+                )}
+              </Button>
+            )}
+            {!stage1Active && (
+              <Pill tone="pass">
+                {run.debug_flags.auto_research
+                  ? "auto-research mode"
+                  : `probe #${run.probe_index} selected`}{" "}
+                · stage {run.stage}
+              </Pill>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Designs list (only in regular mode) */}
+      {designs && !run.debug_flags.auto_research && (
         <section className="space-y-3">
           <div className="flex items-center justify-between">
             <SectionLabel>Probe candidates ({designs.length})</SectionLabel>
             <div className="text-[11px] text-ink-500">
-              {run.stage === 1 ? "select one to continue" : "selection locked"}
+              {stage1Active ? "select one to continue" : "selection locked"}
             </div>
           </div>
           {designs.map((d, i) => {
@@ -141,7 +198,7 @@ export function Stage1({
                         {d.possible_sources.join(" · ")}
                       </div>
                     )}
-                    {run.stage === 1 && (
+                    {stage1Active && (
                       <div className="mt-3">
                         <Button
                           size="sm"
@@ -167,6 +224,49 @@ export function Stage1({
         </div>
       )}
     </div>
+  );
+}
+
+function ModeToggle({
+  autoResearch,
+  onChange,
+  disabled,
+}: {
+  autoResearch: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        <button
+          role="switch"
+          aria-checked={autoResearch}
+          disabled={disabled}
+          onClick={() => onChange(!autoResearch)}
+          className={`mt-0.5 w-9 h-5 rounded-full transition-colors flex-shrink-0 relative ${
+            autoResearch ? "bg-ink-900" : "bg-ink-200"
+          } ${disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}
+        >
+          <span
+            className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${
+              autoResearch ? "left-[18px]" : "left-0.5"
+            }`}
+          />
+        </button>
+        <div className="flex-1">
+          <div className="text-[13px] font-medium text-ink-900">
+            Auto-research mode
+          </div>
+          <p className="mt-0.5 text-[12px] text-ink-600 leading-relaxed">
+            Skip probe design and dev plan. The agent picks a standard
+            performance metric for your task and goes straight from train.py
+            inspection → prober + integration → iteration. No threshold, no
+            PASS/FAIL — just push the metric round after round.
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 
