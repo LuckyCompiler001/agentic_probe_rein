@@ -1,0 +1,118 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Ethnicity-Stratified Performance Disparity",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, FPR, FNR, and PPV separately for each of the 6 ethnicity groups. Quantify disparity using gaps (max-min) and ratios (min/max) across groups, and report Equal Opportunity Difference, Equalized Odds Difference, and Demographic Parity Difference. Healthy: small gaps (<5% AUROC spread) and ratio close to 1.0. Unhealthy: a minority subgroup shows substantially worse FNR \u2014 patients who actually die get flagged as low-risk more often \u2014 which mirrors the systemic bias documented in Obermeyer et al. 2019 and Chen et al. 2018.",
+      "possible_sources": [
+        "Chen et al. 2018, 'Why Is My Classifier Discriminatory?' NeurIPS",
+        "Obermeyer et al. 2019, 'Dissecting racial bias in an algorithm used to manage health', Science",
+        "Hardt et al. 2016, 'Equality of Opportunity in Supervised Learning', NeurIPS",
+        "IBM AIF360 toolkit",
+        "Fairlearn library"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Group-wise Calibration of Mortality Probabilities",
+      "content": "Because the output is a mortality probability used for clinical risk stratification, miscalibration is harmful even when discrimination is good. Compute Expected Calibration Error (ECE), Maximum Calibration Error (MCE), Brier score, and reliability diagrams overall AND stratified by ethnicity. Healthy: ECE < 0.05 across all groups, reliability curves on the diagonal. Unhealthy: predicted 0.3 risk corresponds to 0.5 empirical mortality in a particular subgroup \u2014 a well-known clinical-AI failure mode (Pfohl et al. 2021).",
+      "possible_sources": [
+        "Guo et al. 2017, 'On Calibration of Modern Neural Networks', ICML",
+        "Pfohl et al. 2021, 'An empirical characterization of fair machine learning for clinical risk prediction', JBI",
+        "Niculescu-Mizil & Caruana 2005, 'Predicting good probabilities with supervised learning'",
+        "Naeini et al. 2015, 'Obtaining Well Calibrated Probabilities Using Bayesian Binning'"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Class Imbalance and Base-Rate Sensitivity",
+      "content": "ICU in-hospital mortality is typically 8\u201313% in MIMIC cohorts, so accuracy is misleading. Inspect class prevalence overall and by ethnicity group, then check whether the model collapses to the majority class for under-represented subgroups. Report AUPRC (more informative than AUROC under imbalance) and decision-threshold sensitivity. Healthy: AUPRC well above the prevalence baseline; loss weighting / resampling stabilizes minority-class recall. Unhealthy: high AUROC but AUPRC near prevalence, indicating ranking quality but no usable threshold.",
+      "possible_sources": [
+        "Harutyunyan et al. 2019, 'Multitask learning and benchmarking with clinical time series data', Scientific Data (MIMIC-III benchmark)",
+        "Saito & Rehmsmeier 2015, 'The Precision-Recall Plot is More Informative than the ROC Plot'",
+        "Johnson et al. 2016, MIMIC-III dataset"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train/Val/Test Gap and Overfitting Curves",
+      "content": "With a 10,000-dim TF-IDF input and limited ICU cohort size, overfitting is a primary risk. Track training vs. validation loss/AUROC across epochs; check for divergence. Run k-fold CV stratified by both label and ethnicity to confirm stability. Healthy: validation curve plateaus close to train; CV std < a few AUROC points. Unhealthy: train AUROC ~1.0 with val AUROC dropping after early epochs, or large CV variance \u2014 typical for high-dim sparse inputs without regularization.",
+      "possible_sources": [
+        "Hastie, Tibshirani, Friedman, 'Elements of Statistical Learning', ch. on high-dim regression",
+        "Caruana et al. 2015, 'Intelligible Models for HealthCare', KDD",
+        "Rajkomar et al. 2018, 'Scalable and accurate deep learning with EHRs', npj Digital Medicine"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Sensitivity to Note Length and Vocabulary Coverage",
+      "content": "TF-IDF on clinical notes is sensitive to note length, OOV terms, and abbreviation variation. Bin test patients by note length (quartiles) and by fraction of in-vocabulary tokens; evaluate AUROC per bin. Also perturb notes with synonym substitution (UMLS) and abbreviation expansion. Healthy: AUROC stable across length quartiles and after clinically equivalent perturbation. Unhealthy: short-note patients (often emergency admits, possibly correlated with ethnicity/SES) get systematically worse predictions \u2014 a hidden confounder of any apparent fairness gap.",
+      "possible_sources": [
+        "Alsentzer et al. 2019, 'Publicly Available Clinical BERT Embeddings', ClinicalNLP",
+        "Si et al. 2019, 'Enhancing clinical concept extraction with contextual embeddings', JAMIA",
+        "Wang et al. 2020, 'A Comparison of Word Embeddings for the Biomedical NLP'"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Counterfactual Ethnicity Intervention",
+      "content": "Since ethnicity is fed in as an explicit 6-dim one-hot, the model can directly condition on it. For each test patient, hold the TF-IDF features fixed and sweep through all 6 ethnicity codes; measure how predicted mortality changes (\u0394p). Healthy: |\u0394p| is small and unbiased \u2014 ethnicity is not driving the score given the clinical text. Unhealthy: flipping ethnicity changes mortality probability by >0.05 systematically in one direction, indicating disparate treatment / direct discrimination, not merely disparate impact.",
+      "possible_sources": [
+        "Kusner et al. 2017, 'Counterfactual Fairness', NeurIPS",
+        "Pfohl et al. 2019, 'Creating Fair Models of Atherosclerotic Cardiovascular Disease Risk', AIES",
+        "Garg et al. 2019, 'Counterfactual Fairness in Text Classification through Robustness', AIES"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Top-Feature Attribution and Spurious Token Audit",
+      "content": "Inspect model coefficients (if linear) or SHAP/LIME attributions over the 10,000 TF-IDF features. Identify the top positive and negative tokens globally and per ethnicity subgroup. Check for clinically plausible terms (e.g., 'comfort care', 'pressors', 'GCS') vs. spurious markers (e.g., service identifiers, scribe names, demographic leakage tokens like 'Hispanic'). Healthy: top features are clinically meaningful and stable across subgroups. Unhealthy: ethnicity-correlated tokens or hospital-process artifacts dominate, signalling shortcut learning.",
+      "possible_sources": [
+        "Lundberg & Lee 2017, 'A Unified Approach to Interpreting Model Predictions' (SHAP), NeurIPS",
+        "Ribeiro et al. 2016, 'Why Should I Trust You? Explaining the Predictions of Any Classifier' (LIME), KDD",
+        "Caruana et al. 2015, 'Intelligible Models for Healthcare'"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data_leakage",
+      "probe_name": "Outcome Leakage from Discharge / End-of-Life Vocabulary",
+      "content": "Clinical notes often contain post-hoc or end-of-life language ('expired', 'family meeting re: withdrawal', 'comfort measures only', 'time of death') that trivially leaks the mortality label. Audit the corpus: for patients who died, what fraction of their notes contain such terms before the prediction cutoff? Train an ablation removing these tokens and compare AUROC. Healthy: AUROC drops only modestly (<0.02) \u2014 model relies on real physiology. Unhealthy: AUROC drops sharply, exposing label leakage that inflates apparent performance and may mask fairness issues.",
+      "possible_sources": [
+        "Boag et al. 2018, 'What's in a Note? Unpacking Predictive Value in Clinical Note Representations', AMIA",
+        "Ghassemi et al. 2018, 'A Review of Challenges and Opportunities in Machine Learning for Health'",
+        "Lehman et al. 2022, 'Learning to Ask Like a Physician', ClinicalNLP"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Decision-Threshold and Operating-Point Fairness",
+      "content": "A single threshold (e.g., 0.5) often produces unequal subgroup error rates even when AUROC is similar. Sweep thresholds and plot per-group ROC and PR curves; find group-specific thresholds that equalize either FNR (Equal Opportunity) or both FNR/FPR (Equalized Odds). Report cost of fairness: the AUROC/utility loss when constrained. Healthy: a single global threshold yields near-equal subgroup error. Unhealthy: enforcing fairness costs >5% utility, indicating the underlying score distributions differ across groups (a representation-quality issue, not just a threshold issue).",
+      "possible_sources": [
+        "Hardt et al. 2016, 'Equality of Opportunity in Supervised Learning', NeurIPS",
+        "Pleiss et al. 2017, 'On Fairness and Calibration', NeurIPS",
+        "Corbett-Davies et al. 2017, 'Algorithmic Decision Making and the Cost of Fairness', KDD"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "representation",
+      "probe_name": "TF-IDF vs. Pretrained Clinical LM Representation Quality",
+      "content": "The project description mentions a 'pretrained clinical language model' but the listed input is a 10,000-dim TF-IDF \u2014 a mismatch worth probing. Compare a TF-IDF + logistic-regression / MLP baseline against ClinicalBERT / BioBERT / Clinical-Longformer embeddings on the same cohort, evaluating both overall AUROC and ethnicity-stratified gaps. Healthy: pretrained representations improve discrimination AND reduce subgroup gaps because they generalize better on under-represented vocabulary. Unhealthy: pretrained embeddings improve overall AUROC but widen disparity, indicating the LM encodes demographic correlations from its pretraining corpus.",
+      "possible_sources": [
+        "Alsentzer et al. 2019, 'Publicly Available Clinical BERT Embeddings'",
+        "Huang et al. 2019, 'ClinicalBERT: Modeling Clinical Notes and Predicting Hospital Readmission'",
+        "Lee et al. 2020, 'BioBERT: a pre-trained biomedical language representation model'",
+        "Zhang et al. 2020, 'Hurtful Words: Quantifying Biases in Clinical Contextual Word Embeddings', CHIL"
+      ],
+      "confidence": 0.0
+    }
+  ]
+}

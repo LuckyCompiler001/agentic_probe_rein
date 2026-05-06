@@ -1,0 +1,114 @@
+{
+  "probe_designs": [
+    {
+      "probe_type": "fairness",
+      "probe_name": "Per-ethnicity AUROC and AUPRC disparity",
+      "content": "Compute AUROC, AUPRC, sensitivity, specificity, and Brier score separately for each of the 6 ethnicity groups in the test set. Report subgroup performance gaps (max-min, std across groups) and check overlap of bootstrap confidence intervals (n=1000). Healthy: subgroup AUROCs within ~0.02 of overall AUROC and overlapping CIs; Unhealthy: a minority subgroup shows AUROC drop >0.05 or non-overlapping CI compared to the majority group, signaling systematic disparity. Stratify also by subgroup prevalence to flag whether small-n groups are simply noisy vs. truly under-served.",
+      "possible_sources": [
+        "Chen et al., 'Why Is My Classifier Discriminatory?' NeurIPS 2018",
+        "Seyyed-Kalantari et al., 'CheXclusion: Fairness gaps in deep chest X-ray classifiers', PSB 2021",
+        "Pfohl et al., 'An empirical characterization of fair machine learning for clinical risk prediction', JBI 2021"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "fairness",
+      "probe_name": "Equalized odds and calibration parity across ethnicity",
+      "content": "Beyond accuracy metrics, evaluate group-conditional fairness criteria: equalized odds (TPR/FPR gap across ethnicities at a fixed operating threshold), demographic parity difference, and calibration-within-groups (reliability diagrams + ECE per ethnic group). Also compute predictive parity (PPV gap). Healthy: TPR/FPR/ECE differences <0.05 across groups; Unhealthy: minority group has systematically higher FNR (more missed deaths) or worse calibration\u2014both clinically harmful. Compare to a logistic-regression baseline to attribute disparity to representation vs. classifier.",
+      "possible_sources": [
+        "Hardt et al., 'Equality of Opportunity in Supervised Learning', NeurIPS 2016",
+        "Pleiss et al., 'On Fairness and Calibration', NeurIPS 2017",
+        "R\u00f6\u00f6sli et al., 'Bias at warp speed: how AI may contribute to the disparities gap', JAMIA 2022"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "calibration",
+      "probe_name": "Global probability calibration assessment",
+      "content": "Assess whether predicted mortality probabilities are well-calibrated using reliability diagrams (10 bins), Expected Calibration Error (ECE), Maximum Calibration Error (MCE), and Brier score decomposition (reliability + resolution). Apply Platt scaling and isotonic regression on a held-out validation set and report post-hoc improvement. Healthy: ECE <0.03 and reliability curve close to diagonal. Unhealthy: systematic over- or under-confidence (common for small clinical datasets), which would make predicted mortality risk unreliable for triage decisions.",
+      "possible_sources": [
+        "Guo et al., 'On Calibration of Modern Neural Networks', ICML 2017",
+        "Niculescu-Mizil & Caruana, 'Predicting Good Probabilities With Supervised Learning', ICML 2005",
+        "Van Calster et al., 'Calibration: the Achilles heel of predictive analytics', BMC Medicine 2019"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "Class imbalance and label-prevalence audit",
+      "content": "ICU in-hospital mortality is typically ~10\u201315% positive class. Inspect train/val/test prevalence per ethnicity group, check for stratified split leakage by patient/admission ID (MIMIC patients can have multiple admissions), and check token/note-length distribution disparities by ethnicity. Compute base rates per group and ensure small subgroups (e.g., Native American) have enough positive samples for meaningful evaluation (rule of thumb: \u226510 events per variable, or use bootstrap to flag unstable metrics). Healthy: similar prevalence across splits, no patient leakage. Unhealthy: a subgroup with <30 deaths in test, unstable metrics.",
+      "possible_sources": [
+        "Johnson et al., 'MIMIC-III, a freely accessible critical care database', Scientific Data 2016",
+        "Harutyunyan et al., 'Multitask learning and benchmarking with clinical time series data', Scientific Data 2019",
+        "Riley et al., 'Calculating the sample size required for developing a clinical prediction model', BMJ 2020"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "data",
+      "probe_name": "TF-IDF feature quality and vocabulary bias",
+      "content": "Inspect the 10k TF-IDF vocabulary: token sparsity per document, ratio of stopwords/medical jargon, presence of identity-revealing tokens (e.g., 'Hispanic', 'African American', 'Spanish-speaking') that could leak the protected attribute. Compute mutual information between top features and (a) mortality label and (b) ethnicity. Healthy: top mortality features are clinically meaningful (e.g., 'vent', 'pressors', 'GCS'); Unhealthy: identity tokens rank highly for mortality, indicating the model can shortcut via ethnicity proxy in text\u2014a well-known source of bias in clinical NLP.",
+      "possible_sources": [
+        "Zhang et al., 'Hurtful Words: Quantifying Biases in Clinical Contextual Word Embeddings', CHIL 2020",
+        "Sun et al., 'Mitigating Gender Bias in Natural Language Processing: Literature Review', ACL 2019",
+        "Boag et al., 'Hard for humans, hard for machines: predicting readmission after psychiatric hospitalization', AMIA 2021"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "generalization",
+      "probe_name": "Train\u2013val\u2013test gap and learning-curve diagnosis",
+      "content": "Plot training vs. validation loss/AUROC across epochs; compute the generalization gap and inspect the early-stopping epoch. Build a learning curve by training on 25/50/75/100% of data and extrapolating performance vs. data size. Healthy: smooth monotonic decrease in val loss with small final gap (<0.05 AUROC), and learning curve plateaus\u2014suggesting added data won't help much. Unhealthy: large train-test gap (overfit to TF-IDF noise), or curve still rising sharply (under-trained / data-starved).",
+      "possible_sources": [
+        "Hestness et al., 'Deep Learning Scaling is Predictable, Empirically', arXiv 2017",
+        "Goodfellow, Bengio, Courville, 'Deep Learning', Chapter 5",
+        "Rajkomar et al., 'Scalable and accurate deep learning with electronic health records', npj Digital Medicine 2018"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "robustness",
+      "probe_name": "Input perturbation and note-truncation sensitivity",
+      "content": "Test stability of mortality predictions under realistic perturbations: random word dropout (10/25/50%), synonym substitution from UMLS, truncation of the last/first 25% of the note, and de-identification placeholder injection. Measure \u0394prediction and \u0394ranking (Kendall's tau) before/after perturbation. Healthy: predictions are stable to small perturbations (mean |\u0394p| <0.05) and rank-stable. Unhealthy: small perturbations flip the predicted class, indicating reliance on brittle TF-IDF n-grams rather than clinically robust signals.",
+      "possible_sources": [
+        "Ribeiro et al., 'Beyond Accuracy: Behavioral Testing of NLP Models with CheckList', ACL 2020",
+        "Wang et al., 'Adversarial Attacks and Defenses in Deep Learning for Medical Imaging', 2021",
+        "Araujo et al., 'Robustness of clinical predictive models to text perturbations', JAMIA Open 2022"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "interpretability",
+      "probe_name": "Feature attribution and clinical plausibility",
+      "content": "Use linear-model coefficients (if logistic head) or LIME/SHAP for the trained model on a sample of correctly and incorrectly predicted notes. Have a clinician (or a curated ICD/UMLS lexicon proxy) check whether top-ranked tokens correspond to known mortality risk factors (sepsis, vasopressors, multi-organ failure). Stratify attributions by ethnicity to detect whether the model uses different feature patterns for different groups. Healthy: top features are clinically meaningful and consistent across groups. Unhealthy: model relies on demographic proxies, administrative artifacts, or ethnicity-correlated tokens.",
+      "possible_sources": [
+        "Lundberg & Lee, 'A Unified Approach to Interpreting Model Predictions', NeurIPS 2017",
+        "Caruana et al., 'Intelligible Models for HealthCare', KDD 2015",
+        "Ribeiro et al., '\"Why Should I Trust You?\": Explaining the Predictions of Any Classifier', KDD 2016"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "bias",
+      "probe_name": "Counterfactual ethnicity-flip test",
+      "content": "Hold the TF-IDF text vector fixed and flip the 6-dim ethnicity one-hot through all 6 categories; record the change in predicted mortality probability for each patient. Compute mean and max |\u0394p| per source-target ethnicity pair, and the fraction of patients whose predicted class changes. Healthy: ethnicity feature contributes negligibly (|\u0394p| <0.02), suggesting predictions are driven by clinical content. Unhealthy: large counterfactual shifts, especially asymmetric ones (e.g., flipping to 'Black' raises predicted mortality), revealing the model encodes ethnicity-driven priors that may amplify disparity.",
+      "possible_sources": [
+        "Kusner et al., 'Counterfactual Fairness', NeurIPS 2017",
+        "Garg et al., 'Counterfactual Fairness in Text Classification through Robustness', AIES 2019",
+        "Pfohl et al., 'Creating fair models of atherosclerotic cardiovascular disease risk', AIES 2019"
+      ],
+      "confidence": 0.0
+    },
+    {
+      "probe_type": "baseline_comparison",
+      "probe_name": "Comparison against simple and clinical baselines",
+      "content": "Benchmark the model against (a) logistic regression on TF-IDF, (b) a notes-free clinical scoring baseline like SAPS-II / OASIS / SOFA computed from structured ICU data if available, (c) a 'majority class' predictor, and (d) a no-text model using only the 6-dim ethnicity vector. Report AUROC, AUPRC, and per-subgroup metrics for each. Healthy: the trained model meaningfully outperforms logistic-regression-on-TF-IDF (\u22650.02 AUROC) and is competitive with established clinical scores (~0.80\u20130.85 AUROC range reported in literature). Unhealthy: the model barely beats LR (no value from a 'pretrained clinical LM'), or worse, is matched by ethnicity-only features\u2014indicating shortcut learning.",
+      "possible_sources": [
+        "Le Gall et al., 'A new Simplified Acute Physiology Score (SAPS II)', JAMA 1993",
+        "Johnson et al., 'A new severity of illness scale using a subset of APACHE data elements (OASIS)', Critical Care Medicine 2013",
+        "Si & Roberts, 'Deep Patient Representation of Clinical Notes via Multi-Task Learning for Mortality Prediction', AMIA 2019"
+      ],
+      "confidence": 0.0
+    }
+  ]
+}
